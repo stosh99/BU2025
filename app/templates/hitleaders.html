@@ -4,21 +4,18 @@
 
 {% block content %}
 <div class="container mt-2">
-        <div class="mb-2">
-          <h1 class="mb-0">Hit Leaders</h1>
-            <small class="text-muted d-block" style="line-height: 1;">(325 AB per Season)</small>
-        </div>
     <p class="lead">Stats as of {{ date.strftime('%B %d, %Y') }}</p>
 
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h2 class="h4 mb-0">Hitter Leaders</h2>
+            <h2 class="h4 mb-0">Hitter Leaders</h2><small class="text-muted d-block" style="line-height: 1;">(325 AB per Season)</small>
         </div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-striped table-hover full-width-table">
                     <thead class="thead-dark">
                         <tr>
+                            <th class="stats-cell team-name">BU Team</th>
                             <th class="stats-cell team-name">Player</th>
                             <th class="stats-cell">AB</th>
                             <th class="stats-cell">H</th>
@@ -40,17 +37,18 @@
                     <tbody>
                         {% for player in players %}
                         <tr>
+                            <td class="stats-cell team-name">{{ player.BUTeam }}</td>
                             <td class="stats-cell team-name">{{ player.Player }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player.AB|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player.H|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player._2B|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player._3B|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player.HR|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player.BB|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player.HP|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player.SB|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player.CS|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(player.E|float) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player.AB|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player.H|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player._2B|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player._3B|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player.HR|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player.BB|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player.HP|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player.SB|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player.CS|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(player.E|int) }}</td>
                             <td class="stats-cell">{{ "%.3f"|format(player.AVG|float) }}</td>
                             <td class="stats-cell">{{ "%.3f"|format(player.OBP|float) }}</td>
                             <td class="stats-cell">{{ "%.3f"|format(player.SLG|float) }}</td>
