@@ -24,9 +24,17 @@
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav">
                         <li class="nav-item">
-                            <a class="nav-link active" href="{{ url_for('main.home') }}">Standings</a>
+                            <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('main.home') }}">Standings</a>
                         </li>
-                        <!-- Add more navigation items here as you develop more pages -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/team-stats' %}active{% endif %}" href="{{ url_for('main.team_stats') }}">Team Stats</a>
+                        </li>
+                            <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/hitleaders' %}active{% endif %}" href="{{ url_for('main.hit_leaders') }}">Hit Leaders</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/pitchleaders' %}active{% endif %}" href="{{ url_for('main.pitch_leaders') }}">Pitch Leaders</a>
+                        </li>
                     </ul>
                 </div>
             </div>
