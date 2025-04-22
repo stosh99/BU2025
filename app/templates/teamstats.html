@@ -37,16 +37,16 @@
                         {% for team in teams %}
                         <tr>
                             <td class="stats-cell team-name">{{ team.BUTeam }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team.AB|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team.H|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team._2B|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team._3B|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team.HR|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team.BB|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team.HP|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team.SB|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team.CS|float) }}</td>
-                            <td class="stats-cell">{{ "%.1f"|format(team.E|float) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team.AB|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team.H|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team._2B|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team._3B|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team.HR|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team.BB|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team.HP|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team.SB|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team.CS|int) }}</td>
+                            <td class="stats-cell">{{ "%d"|format(team.E|int) }}</td>
                             <td class="stats-cell">{{ "%.3f"|format(team.AVG|float) }}</td>
                             <td class="stats-cell">{{ "%.3f"|format(team.OBP|float) }}</td>
                             <td class="stats-cell">{{ "%.3f"|format(team.SLG|float) }}</td>
@@ -82,7 +82,7 @@
                             <th class="pitcher-stats-cell">S</th>
                             <th class="pitcher-stats-cell">HA</th>
                             <th class="pitcher-stats-cell">K</th>
-                            <th class="pitcher-stats-cell">BBI</th>
+                            <th class="pitcher-stats-cell">BB</th>
                             <th class="pitcher-stats-cell">BB9</th>
                             <th class="pitcher-stats-cell">K9</th>
                             <th class="pitcher-stats-cell">WHIP</th>
@@ -92,18 +92,18 @@
                         {% for team in teams %}
                         <tr>
                             <td class="pitcher-stats-cell team-name">{{ team.BUTeam }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.APP|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.GS|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.QS|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.APP|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.GS|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.QS|int) }}</td>
                             <td class="pitcher-stats-cell">{{ "%.1f"|format(team.INN|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.ER|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.ER|int) }}</td>
                             <td class="pitcher-stats-cell">{{ "%.2f"|format(team.ERA|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.W|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.L|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.S|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.HA|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.K|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.BBI|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.W|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.L|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.S|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.HA|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.K|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(team.BBI|int) }}</td>
                             <td class="pitcher-stats-cell">{{ "%.2f"|format(team.BB9|float) }}</td>
                             <td class="pitcher-stats-cell">{{ "%.2f"|format(team.K9|float) }}</td>
                             <td class="pitcher-stats-cell">{{ "%.3f"|format(team.WHIP|float) }}</td>
