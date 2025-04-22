@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Hit Leaders{% endblock %}
+
+{% block content %}
+<div class="container mt-2">
+        <div class="mb-2">
+          <h1 class="mb-0">Hit Leaders</h1>
+            <small class="text-muted d-block" style="line-height: 1;">(325 AB per Season)</small>
+        </div>
+    <p class="lead">Stats as of {{ date.strftime('%B %d, %Y') }}</p>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h2 class="h4 mb-0">Hitter Leaders</h2>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover full-width-table">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th class="stats-cell team-name">Player</th>
+                            <th class="stats-cell">AB</th>
+                            <th class="stats-cell">H</th>
+                            <th class="stats-cell">2B</th>
+                            <th class="stats-cell">3B</th>
+                            <th class="stats-cell">HR</th>
+                            <th class="stats-cell">BB</th>
+                            <th class="stats-cell">HP</th>
+                            <th class="stats-cell">SB</th>
+                            <th class="stats-cell">CS</th>
+                            <th class="stats-cell">E</th>
+                            <th class="stats-cell">AVG</th>
+                            <th class="stats-cell">OBP</th>
+                            <th class="stats-cell">SLG</th>
+                            <th class="stats-cell">OPS</th>
+                            <th class="stats-cell">RC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player in players %}
+                        <tr>
+                            <td class="stats-cell team-name">{{ player.Player }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player.AB|float) }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player.H|float) }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player._2B|float) }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player._3B|float) }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player.HR|float) }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player.BB|float) }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player.HP|float) }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player.SB|float) }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player.CS|float) }}</td>
+                            <td class="stats-cell">{{ "%.1f"|format(player.E|float) }}</td>
+                            <td class="stats-cell">{{ "%.3f"|format(player.AVG|float) }}</td>
+                            <td class="stats-cell">{{ "%.3f"|format(player.OBP|float) }}</td>
+                            <td class="stats-cell">{{ "%.3f"|format(player.SLG|float) }}</td>
+                            <td class="stats-cell">{{ "%.3f"|format(player.OPS|float) }}</td>
+                            <td class="stats-cell">{{ "%.2f"|format(player.RC|float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,36 +1,42 @@
-body {
-    font-family: 'Roboto', sans-serif;
+/* Table column styling for standings table */
+.team-column {
+    width: 15%; /* Fixed width for team column */
+    text-align: left;
 }
 
-.navbar-brand {
-    font-weight: bold;
+.stat-column {
+    width: calc((100% - 15%) / 8); /* Divides remaining 85% equally among 8 stat columns */
+    text-align: center; /* Center the content within the column */
 }
 
-/* Add animation to tab transitions */
-[x-cloak] {
-    display: none !important;
+/* Full-width table for team stats page */
+.full-width-table {
+    width: 100%;
 }
 
-.tab-content {
-    transition: all 0.3s ease-in-out;
+/* Base styles for all stat cells */
+.stats-cell {
+    text-align: center;
 }
 
-/* Custom card styling */
-.card {
-    margin-bottom: 1.5rem;
-    border-radius: 0.5rem;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    transition: transform 0.2s;
+/* Team column for hitter stats */
+.stats-cell.team-name {
+    width: 15%; /* Fixed width for team column */
+    text-align: left;
 }
 
-.card:hover {
-    transform: translateY(-2px);
+/* All other hitter stat columns */
+.stats-cell:not(.team-name) {
+    width: calc((100% - 15%) / 15); /* Divides remaining 85% among 15 stat columns */
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .container {
-        padding-left: 1.5rem;
-        padding-right: 1.5rem;
-    }
+/* Team column for pitcher stats */
+.pitcher-stats-cell.team-name {
+    width: 15%; /* Fixed width for team column */
+    text-align: left;
+}
+
+/* All other pitcher stat columns */
+.pitcher-stats-cell:not(.team-name) {
+    width: calc((100% - 15%) / 15); /* Divides remaining 85% among 15 stat columns */
 }

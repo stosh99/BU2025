@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Pitch Leaders{% endblock %}
+
+{% block content %}
+<div class="container mt-2">
+    <div class="mb-2">
+        <h1 class="mb-0">Pitch Leaders</h1>
+        <small class="text-muted d-block" style="line-height: 1;">(100 IP per Season)</small>
+    </div>
+    <p class="lead">Stats as of {{ date.strftime('%B %d, %Y') }}</p>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h2 class="h4 mb-0">Pitcher Leaders</h2>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover full-width-table">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th class="pitcher-stats-cell team-name">Player</th>
+                            <th class="pitcher-stats-cell">APP</th>
+                            <th class="pitcher-stats-cell">GS</th>
+                            <th class="pitcher-stats-cell">QS</th>
+                            <th class="pitcher-stats-cell">INN</th>
+                            <th class="pitcher-stats-cell">ER</th>
+                            <th class="pitcher-stats-cell">ERA</th>
+                            <th class="pitcher-stats-cell">W</th>
+                            <th class="pitcher-stats-cell">L</th>
+                            <th class="pitcher-stats-cell">S</th>
+                            <th class="pitcher-stats-cell">HA</th>
+                            <th class="pitcher-stats-cell">K</th>
+                            <th class="pitcher-stats-cell">BBI</th>
+                            <th class="pitcher-stats-cell">BB9</th>
+                            <th class="pitcher-stats-cell">K9</th>
+                            <th class="pitcher-stats-cell">WHIP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player in players %}
+                        <tr>
+                            <td class="pitcher-stats-cell team-name">{{ player.clean_name }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.APP|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.GS|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.QS|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.INN|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.ER|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.2f"|format(player.ERA|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.W|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.L|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.S|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.HA|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.K|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.BBI|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.2f"|format(player.BB9|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.2f"|format(player.K9|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.3f"|format(player.WHIP|float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
