@@ -15,3 +15,7 @@ def create_team(name, owner, salary=0.0, contract=0.0):
     db.session.add(team)
     db.session.commit()
     return team
+
+def get_all_teams():
+    """Get all teams from the database"""
+    return Team.query.all()

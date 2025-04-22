@@ -10,9 +10,12 @@ class Config:
     # Flask settings
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
 
+    # Initialize class variables
+    tunnel = None
+
     # Database settings based on environment
-    @staticmethod
-    def get_database_uri():
+    @classmethod
+    def get_database_uri(cls):
         # Check if we're in development or production
         deployment = os.environ.get('DEPLOYMENT_ENVIRONMENT', 'development')
 
@@ -31,7 +34,7 @@ class Config:
             mysql_password = os.environ.get('DEV_MYSQL_PASSWORD')
 
             # Create a global tunnel to use throughout the application
-            Config.tunnel = sshtunnel.SSHTunnelForwarder(
+            cls.tunnel = sshtunnel.SSHTunnelForwarder(
                 (ssh_host),
                 ssh_username=ssh_username,
                 ssh_password=ssh_password,
@@ -39,26 +42,19 @@ class Config:
                 local_bind_address=('127.0.0.1', 0)  # Use a random local port
             )
 
-            Config.tunnel.start()
+            cls.tunnel.start()
 
             # Return connection string to the local tunnel
-            return f"mysql+pymysql://{mysql_user}:{mysql_password}@127.0.0.1:{Config.tunnel.local_bind_port}/{mysql_db}"
-
-    SQLALCHEMY_DATABASE_URI = get_database_uri.__func__()
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+            return f"mysql+pymysql://{mysql_user}:{mysql_password}@127.0.0.1:{cls.tunnel.local_bind_port}/{mysql_db}"
 
 
-class DevelopmentConfig(Config):
-    DEBUG = True
-
-
-class ProductionConfig(Config):
-    DEBUG = False
-
+# Initialize the database URI after the class definition
+Config.SQLALCHEMY_DATABASE_URI = Config.get_database_uri()
+Config.SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # Dictionary with different configuration environments
 config = {
-    'development': DevelopmentConfig,
-    'production': ProductionConfig,
-    'default': DevelopmentConfig
+    'development': Config,
+    'production': Config,
+    'default': Config
 }

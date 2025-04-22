@@ -11,9 +11,10 @@ migrate = Migrate(app, db)
 
 # Import models so they're detected by Alembic
 # Add all your models here
-
-with app.app_context():
-    # Create the migrations directory
+#
+#
+#
+# Create the migrations directory
     init()
 
     # Create a migration

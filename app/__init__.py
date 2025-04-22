@@ -1,7 +1,5 @@
 from flask import Flask
-from config import config, Config
-from app.extensions import db, migrate
-import atexit
+from config import config  # Import the config dictionary, not Config directly
 
 
 def create_app(config_name='default'):
@@ -10,15 +8,12 @@ def create_app(config_name='default'):
     app.config.from_object(config[config_name])
 
     # Initialize extensions
+    from app.extensions import db, migrate
     db.init_app(app)
     migrate.init_app(app, db)
 
     # Register blueprints
     from app.routes.main import main as main_blueprint
     app.register_blueprint(main_blueprint)
-
-    # Setup SSH tunnel closure on application exit
-    if hasattr(Config, 'tunnel'):
-        atexit.register(lambda: Config.tunnel.stop())
 
     return app

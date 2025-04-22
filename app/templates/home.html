@@ -1,32 +1,49 @@
 {% extends 'base.html' %}
 
-{% block title %}Home - Fantasy Baseball League{% endblock %}
+{% block title %}Baseball Unlimited Standings{% endblock %}
 
 {% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Baseball Unlimited Standings</h1>
+    <p class="lead">Standings as of {{ date.strftime('%B %d, %Y') }}</p>
 
-               Welcome to the Fantasy Baseball League management system. This application helps you manage your fantasy baseball league, including teams, players, stats, and transactions.
-                   League Info
-                    Season: 2025
-                    Teams: {{ teams|length }}
-                                League Standings
-                         Team
-                            Owner
-                            Salary
-                            Contract
-                        
-                    
-                    
-                        {% for team in teams %}
-                        
-                            {{ team.name }}
-                            {{ team.owner }}
-                            ${{ team.salary }}
-                            ${{ team.contract }}
-                            {% else %}
-                           No teams found
-                          {% endfor %}
-                         Recent Activity
-                        April 15, 2025 - Team "Homerun Heroes" added player Mike Trout
-                      April 14, 2025 - Trade completed between "Batting Champs" and "Pitching Pros"
-                     April 12, 2025 - Team "Grand Slammers" dropped player Clayton Kershaw
-                    {% endblock %}
+    <div class="card w-75">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th>Team</th>
+                                <th>RC</th>
+                                <th>RA</th>
+                                <th>Win %</th>
+                                <th>Wins</th>
+                                <th>Losses</th>
+                                <th>Games Back</th>
+                                <th>Last 6 W</th>
+                                <th>Last 6 L</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for team in teams %}
+                            <tr>
+                                <td>{{ team.BUTeam }}</td>
+                                <td>{{ "%.2f"|format(team.RC|float) }}</td>
+                                <td>{{ "%.2f"|format(team.RA|float) }}</td>
+                                <td>{{ "%.3f"|format(team.WP|float) }}</td>
+                                <td>{{ "%.2f"|format(team.Wins|float) }}</td>
+                                <td>{{ "%.2f"|format(team.Losses|float) }}</td>
+                                <td>{{ "%.2f"|format(team.GamesBack|float) }}</td>
+                                <td>{{ "%.2f"|format(team.Last6W|float) }}</td>
+                                <td>{{ "%.2f"|format(team.Last6L|float) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
