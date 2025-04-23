@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template
 from app.models.team import Team
-from app.models.hitter import HitterStats
-from app.models.pitcher import PitcherStats
+from app.models.hitter import HitterStats, HitterStats_yest
+from app.models.pitcher import PitcherStats, PitcherStats_yest
 from app.extensions import db
 from sqlalchemy import desc
 from datetime import datetime  # Add this import
@@ -131,3 +131,189 @@ def pitch_leaders():
             player.WHIP = 0
 
     return render_template('pitchleaders.html', players=players, date=most_recent_date, now=datetime.now())
+
+
+@main.route('/teamstatsyest')
+def teamstatsyest():
+    # Find the two most recent dates in the teamstat table
+    recent_dates = db.session.query(Team.Date).distinct().order_by(desc(Team.Date)).limit(2).all()
+
+    if len(recent_dates) < 2:
+        # Not enough dates for comparison
+        flash("Need at least two dates with data to calculate changes", "warning")
+        return redirect(url_for('main.team_stats'))
+
+    most_recent_date = recent_dates[0][0]
+    previous_date = recent_dates[1][0]
+
+    # Get team data for both dates
+    current_teams = {team.BUTeam: team for team in Team.query.filter_by(Date=most_recent_date).all()}
+    previous_teams = {team.BUTeam: team for team in Team.query.filter_by(Date=previous_date).all()}
+
+    # Calculate differences
+    team_changes = []
+    for buteam, current in current_teams.items():
+        if buteam in previous_teams:
+            # Create a new object to hold the changes
+            changes = type('TeamChanges', (), {})()
+            changes.BUTeam = buteam
+
+            # Hitting stats changes
+            changes.G = current.G - previous_teams[buteam].G if current.G and previous_teams[buteam].G else 0
+            changes.AB = current.AB - previous_teams[buteam].AB if current.AB and previous_teams[buteam].AB else 0
+            changes.H = current.H - previous_teams[buteam].H if current.H and previous_teams[buteam].H else 0
+            changes._2B = current._2B - previous_teams[buteam]._2B if current._2B and previous_teams[buteam]._2B else 0
+            changes._3B = current._3B - previous_teams[buteam]._3B if current._3B and previous_teams[buteam]._3B else 0
+            changes.HR = current.HR - previous_teams[buteam].HR if current.HR and previous_teams[buteam].HR else 0
+            changes.BB = current.BB - previous_teams[buteam].BB if current.BB and previous_teams[buteam].BB else 0
+            changes.HP = current.HP - previous_teams[buteam].HP if current.HP and previous_teams[buteam].HP else 0
+            changes.SB = current.SB - previous_teams[buteam].SB if current.SB and previous_teams[buteam].SB else 0
+            changes.CS = current.CS - previous_teams[buteam].CS if current.CS and previous_teams[buteam].CS else 0
+            changes.E = current.E - previous_teams[buteam].E if current.E and previous_teams[buteam].E else 0
+            changes.KO = current.KO - previous_teams[buteam].KO if current.KO and previous_teams[buteam].KO else 0
+            changes.RC = current.RC - previous_teams[buteam].RC if current.RC and previous_teams[buteam].RC else 0
+            changes.OPS = current.OPS - previous_teams[buteam].OPS if current.OPS and previous_teams[buteam].OPS else 0
+
+            # Pitching stats changes
+            changes.APP = current.APP - previous_teams[buteam].APP if current.APP and previous_teams[buteam].APP else 0
+            changes.GS = current.GS - previous_teams[buteam].GS if current.GS and previous_teams[buteam].GS else 0
+            changes.QS = current.QS - previous_teams[buteam].QS if current.QS and previous_teams[buteam].QS else 0
+            changes.INN = current.INN - previous_teams[buteam].INN if current.INN and previous_teams[buteam].INN else 0
+            changes.ER = current.ER - previous_teams[buteam].ER if current.ER and previous_teams[buteam].ER else 0
+            changes.RA = current.RA - previous_teams[buteam].RA if current.RA and previous_teams[buteam].RA else 0
+            changes.ERA = current.ERA - previous_teams[buteam].ERA if current.ERA and previous_teams[buteam].ERA else 0
+            changes.HA = current.HA - previous_teams[buteam].HA if current.HA and previous_teams[buteam].HA else 0
+            changes.K = current.K - previous_teams[buteam].K if current.K and previous_teams[buteam].K else 0
+            changes.BBI = current.BBI - previous_teams[buteam].BBI if current.BBI and previous_teams[buteam].BBI else 0
+            changes.W = current.W - previous_teams[buteam].W if current.W and previous_teams[buteam].W else 0
+            changes.L = current.L - previous_teams[buteam].L if current.L and previous_teams[buteam].L else 0
+            changes.S = current.S - previous_teams[buteam].S if current.S and previous_teams[buteam].S else 0
+
+            # Derived pitching stats
+            if changes.INN and changes.INN > 0:
+                changes.BB9 = changes.BBI * 9 / changes.INN
+                changes.K9 = changes.K * 9 / changes.INN
+                changes.WHIP = (changes.BBI + changes.HA) / changes.INN
+                changes.ERA = changes.ER * 9 / changes.INN
+            else:
+                changes.BB9 = 0
+                changes.K9 = 0
+                changes.WHIP = 0
+                changes.ERA = 0
+
+            if changes.AB != 0:
+                changes.AVG = changes.H / changes.AB
+                changes.SLG = (changes.H + changes._2B + 2 * changes._3B + 3 * changes.HR) / changes.AB
+            else:
+                changes.AVG = 0
+                changes.SLG = 0
+
+            if changes.AB + changes.BBI + changes.HP != 0:
+                changes.OBP = (changes.H + changes.BBI + changes.HP)/(changes.AB + changes.BBI + changes.HP)
+            else:
+                changes.OBP = 0
+
+            if changes.AB-changes.H+changes.CS != 0:
+                changes.RC = (2*(changes.H+changes._2B+2*changes._3B+3*changes.HR+changes.BBI+changes.HP)+changes.H+changes.SB - .61 * (changes.AB-changes.H+changes.CS)) * 4.12 /(changes.AB-changes.H+changes.CS)
+            else:
+                changes.RC = 0
+
+            if changes.AB != 0:
+                changes.SLG = (changes.H + changes._2B + 2 * changes._3B + 3 * changes.HR) / changes.AB
+            else:
+                changes.SLG = 0
+
+            changes.OPS = changes.OPS + changes.SLG
+
+            team_changes.append(changes)
+
+    hitting_teams = sorted(team_changes, key=lambda x: x.RC, reverse=True)  # Sort by RC descending
+    pitching_teams = sorted(team_changes, key=lambda x: x.ERA)  # Sort by ERA ascending
+
+    return render_template('teamstatsyest.html',
+                           teams=team_changes,  # Keep the original for backward compatibility
+                           hitting_teams=hitting_teams,
+                           pitching_teams=pitching_teams,
+                           current_date=most_recent_date,
+                           previous_date=previous_date,
+                           now=datetime.now())
+
+
+@main.route('/hitleadersyest')
+def hit_leaders_yest():
+    most_recent_date = db.session.query(db.func.max(HitterStats_yest.Date)).scalar()
+
+    if not most_recent_date:
+        flash("No data available in HitterStats_yest table", "warning")
+        return redirect(url_for('main.home'))
+
+    # Get the maximum BUGames value for qualifying
+    max_games_query = db.session.query(db.func.max(Team.BUGames)) \
+        .filter(Team.Date == most_recent_date).scalar()
+    qualifying_abs = 2 * max_games_query  # This is your 2 * max(BUGames) calculation
+
+    # Query for players with at least the qualifying number of at-bats
+    players = db.session.query(HitterStats_yest).filter(
+        HitterStats_yest.Date == most_recent_date
+    ).order_by(desc(HitterStats_yest.RC)).all()
+
+    # Calculate derived statistics for each player
+    for player in players:
+        # Clean player name
+        if player.Player:
+            player.clean_name = player.Player.replace('\xa0', ' ').replace('\u00A0', ' ')
+            player.clean_name = ''.join(c if c.isprintable() else ' ' for c in player.clean_name)
+            player.clean_name = ' '.join(player.clean_name.split())
+        else:
+            player.clean_name = ''
+
+        if player.AB and player.AB > 0:
+            player.AVG = player.H / player.AB
+            player.OBP = (player.H + player.BB + player.HP) / (player.AB + player.BB + player.HP)
+            player.SLG = (player.H + player._2B + 2 * player._3B + 3 * player.HR) / player.AB
+            player.OPS = player.OBP + player.SLG
+        else:
+            player.AVG = 0
+            player.OBP = 0
+            player.SLG = 0
+            player.OPS = 0
+
+    return render_template('hitleadersyest.html', players=players, date=most_recent_date, now=datetime.now())
+
+
+@main.route('/pitchleadersyest')
+def pitch_leaders_yest():
+    # Find the most recent date in the pitcherStats_yest table
+    most_recent_date = db.session.query(db.func.max(PitcherStats_yest.Date)).scalar()
+
+    if not most_recent_date:
+        flash("No data available in pitcherStats_yest table", "warning")
+        return redirect(url_for('main.home'))
+
+    players = db.session.query(PitcherStats_yest).filter(
+        PitcherStats_yest.Date == most_recent_date,
+        PitcherStats_yest.INN >= .1
+    ).order_by(PitcherStats_yest.ERA).all()  # Ordering by ERA (lower is better)
+
+    for player in players:
+        # Clean player name
+        if player.Player:
+            player.clean_name = player.Player.replace('\xa0', ' ').replace('\u00A0', ' ')
+            player.clean_name = ''.join(c if c.isprintable() else ' ' for c in player.clean_name)
+            player.clean_name = ' '.join(player.clean_name.split())
+        else:
+            player.clean_name = ''
+
+        # Calculate BB/9 and K/9
+        if player.INN and player.INN > 0:
+            player.BB9 = player.BBI * 9 / player.INN
+            player.K9 = player.K * 9 / player.INN
+            player.WHIP = (player.BBI + player.HA) / player.INN
+        else:
+            player.BB9 = 0
+            player.K9 = 0
+            player.WHIP = 0
+
+    return render_template('pitchleadersyest.html', players=players, date=most_recent_date, now=datetime.now())
+
+
