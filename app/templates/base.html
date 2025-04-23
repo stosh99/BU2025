@@ -29,11 +29,20 @@
                         <li class="nav-item">
                             <a class="nav-link {% if request.path == '/team-stats' %}active{% endif %}" href="{{ url_for('main.team_stats') }}">Team Stats</a>
                         </li>
-                            <li class="nav-item">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/teamstatsyest' %}active{% endif %}" href="{{ url_for('main.teamstatsyest') }}">Team Stats Yest</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if request.path == '/hitleaders' %}active{% endif %}" href="{{ url_for('main.hit_leaders') }}">Hit Leaders</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if request.path == '/pitchleaders' %}active{% endif %}" href="{{ url_for('main.pitch_leaders') }}">Pitch Leaders</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/hitleadersyest' %}active{% endif %}" href="{{ url_for('main.hit_leaders_yest') }}">Hit Leaders Yest</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/pitchleadersyest' %}active{% endif %}" href="{{ url_for('main.pitch_leaders_yest') }}">Pitch Leaders Yest</a>
                         </li>
                     </ul>
                 </div>

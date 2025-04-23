@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Pitch Leaders Yesterday - Fantasy Baseball League{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <p class="lead">Stats as of {{ date.strftime('%B %d, %Y') }}</p>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h2 class="h4 mb-0">Pitcher Leaders Yesterday</h2>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover full-width-table">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th class="pitcher-stats-cell team-name">BU Team</th>
+                            <th class="pitcher-stats-cell team-name">Player</th>
+                            <th class="pitcher-stats-cell">APP</th>
+                            <th class="pitcher-stats-cell">GS</th>
+                            <th class="pitcher-stats-cell">QS</th>
+                            <th class="pitcher-stats-cell">INN</th>
+                            <th class="pitcher-stats-cell">ER</th>
+                            <th class="pitcher-stats-cell">ERA</th>
+                            <th class="pitcher-stats-cell">W</th>
+                            <th class="pitcher-stats-cell">L</th>
+                            <th class="pitcher-stats-cell">S</th>
+                            <th class="pitcher-stats-cell">HA</th>
+                            <th class="pitcher-stats-cell">K</th>
+                            <th class="pitcher-stats-cell">BBI</th>
+                            <th class="pitcher-stats-cell">BB9</th>
+                            <th class="pitcher-stats-cell">K9</th>
+                            <th class="pitcher-stats-cell">WHIP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player in players %}
+                        <tr>
+                            <td class="pitcher-stats-cell team-name">{{ player.BUTeam }}</td>
+                            <td class="pitcher-stats-cell team-name">{{ player.clean_name }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.APP|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.GS|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.QS|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.1f"|format(player.INN|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.ER|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.2f"|format(player.ERA|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.W|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.L|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.S|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.HA|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.K|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%d"|format(player.BBI|int) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.2f"|format(player.BB9|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.2f"|format(player.K9|float) }}</td>
+                            <td class="pitcher-stats-cell">{{ "%.3f"|format(player.WHIP|float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
