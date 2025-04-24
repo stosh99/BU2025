@@ -1,124 +1,114 @@
 {% extends 'base.html' %}
 
-{% block title %}Team Stats Yesterday - Fantasy Baseball League{% endblock %}
+{% block title %}Team Stats Yesterday - Baseball Unlimited{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <p class="lead">Stats as of{{ current_date.strftime('%B %d, %Y') }}</p>
-
-    <!-- Hitter Stats Changes Table -->
-    <div class="card mb-5">
-        <div class="card-header bg-primary text-white">
-            <h2 class="h4 mb-0">Hitting Yesterday</h2>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover full-width-table">
-                    <thead class="thead-dark">
-                        <tr>
-                            <th class="stats-cell team-name">Team</th>
-                            <th class="stats-cell">G</th>
-                            <th class="stats-cell">AB</th>
-                            <th class="stats-cell">H</th>
-                            <th class="stats-cell">2B</th>
-                            <th class="stats-cell">3B</th>
-                            <th class="stats-cell">HR</th>
-                            <th class="stats-cell">BB</th>
-                            <th class="stats-cell">HP</th>
-                            <th class="stats-cell">SB</th>
-                            <th class="stats-cell">CS</th>
-                            <th class="stats-cell">E</th>
-                            <th class="stats-cell">KO</th>
-                            <th class="stats-cell">AVG</th>
-                            <th class="stats-cell">OBP</th>
-                            <th class="stats-cell">SLG</th>
-                            <th class="stats-cell">OPS</th>
-                            <th class="stats-cell">RC</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for team in hitting_teams %}
-                        <tr>
-                            <td class="stats-cell team-name">{{ team.BUTeam }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.G|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.AB|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.H|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team._2B|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team._3B|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.HR|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.BB|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.HP|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.SB|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.CS|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.E|int) }}</td>
-                            <td class="stats-cell">{{ "%d"|format(team.KO|int) }}</td>
-                            <td class="stats-cell">{{ "%.3f"|format(team.AVG|float) }}</td>
-                            <td class="stats-cell">{{ "%.3f"|format(team.OBP|float) }}</td>
-                            <td class="stats-cell">{{ "%.3f"|format(team.SLG|float) }}</td>
-                            <td class="stats-cell">{{ "%.3f"|format(team.OPS|float) }}</td>
-                            <td class="stats-cell">{{ "%.2f"|format(team.RC|float) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Hitting Yesterday</h1>
+        <p class="lead m-0">Stats as of {{ current_date.strftime('%B %d, %Y') }}</p>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover full-width-table">
+            <thead class="thead-dark">
+                <tr>
+                    <th class="stats-cell team-name">Team</th>
+                    <th class="stats-cell">G</th>
+                    <th class="stats-cell">AB</th>
+                    <th class="stats-cell">H</th>
+                    <th class="stats-cell">2B</th>
+                    <th class="stats-cell">3B</th>
+                    <th class="stats-cell">HR</th>
+                    <th class="stats-cell">BB</th>
+                    <th class="stats-cell">HP</th>
+                    <th class="stats-cell">SB</th>
+                    <th class="stats-cell">CS</th>
+                    <th class="stats-cell">E</th>
+                    <th class="stats-cell">KO</th>
+                    <th class="stats-cell">AVG</th>
+                    <th class="stats-cell">OBP</th>
+                    <th class="stats-cell">SLG</th>
+                    <th class="stats-cell">OPS</th>
+                    <th class="stats-cell">RC</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in hitting_teams %}
+                <tr>
+                    <td class="stats-cell team-name">{{ team.BUTeam }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.G|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.AB|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.H|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team._2B|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team._3B|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.HR|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.BB|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.HP|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.SB|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.CS|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.E|int) }}</td>
+                    <td class="stats-cell">{{ "%d"|format(team.KO|int) }}</td>
+                    <td class="stats-cell">{{ "%.3f"|format(team.AVG|float) }}</td>
+                    <td class="stats-cell">{{ "%.3f"|format(team.OBP|float) }}</td>
+                    <td class="stats-cell">{{ "%.3f"|format(team.SLG|float) }}</td>
+                    <td class="stats-cell">{{ "%.3f"|format(team.OPS|float) }}</td>
+                    <td class="stats-cell">{{ "%.2f"|format(team.RC|float) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 
     <!-- Pitcher Stats Changes Table -->
-    <div class="card mb-5">
-        <div class="card-header bg-primary text-white">
-            <h2 class="h4 mb-0">Pitching Yesterday</h2>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover full-width-table">
-                    <thead class="thead-dark">
-                        <tr>
-                            <th class="pitcher-stats-cell team-name">Team</th>
-                            <th class="pitcher-stats-cell">APP</th>
-                            <th class="pitcher-stats-cell">GS</th>
-                            <th class="pitcher-stats-cell">QS</th>
-                            <th class="pitcher-stats-cell">INN</th>
-                            <th class="pitcher-stats-cell">ER</th>
-                            <th class="pitcher-stats-cell">ERA</th>
-                            <th class="pitcher-stats-cell">W</th>
-                            <th class="pitcher-stats-cell">L</th>
-                            <th class="pitcher-stats-cell">S</th>
-                            <th class="pitcher-stats-cell">HA</th>
-                            <th class="pitcher-stats-cell">K</th>
-                            <th class="pitcher-stats-cell">BBI</th>
-                            <th class="pitcher-stats-cell">BB9</th>
-                            <th class="pitcher-stats-cell">K9</th>
-                            <th class="pitcher-stats-cell">WHIP</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for team in pitching_teams %}
-                        <tr>
-                            <td class="pitcher-stats-cell team-name">{{ team.BUTeam }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.APP|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.GS|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.QS|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.1f"|format(team.INN|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.ER|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.2f"|format(team.ERA|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.W|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.L|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.S|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.HA|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.K|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%d"|format(team.BBI|int) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.2f"|format(team.BB9|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.2f"|format(team.K9|float) }}</td>
-                            <td class="pitcher-stats-cell">{{ "%.3f"|format(team.WHIP|float) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Pitching Yesterday</h1>
+        <p class="lead m-0">Stats as of {{ current_date.strftime('%B %d, %Y') }}</p>
     </div>
-
+    <div class="table-responsive">
+        <table class="table table-striped table-hover full-width-table">
+            <thead class="thead-dark">
+                <tr>
+                    <th class="pitcher-stats-cell team-name">Team</th>
+                    <th class="pitcher-stats-cell">APP</th>
+                    <th class="pitcher-stats-cell">GS</th>
+                    <th class="pitcher-stats-cell">QS</th>
+                    <th class="pitcher-stats-cell">INN</th>
+                    <th class="pitcher-stats-cell">ER</th>
+                    <th class="pitcher-stats-cell">ERA</th>
+                    <th class="pitcher-stats-cell">W</th>
+                    <th class="pitcher-stats-cell">L</th>
+                    <th class="pitcher-stats-cell">S</th>
+                    <th class="pitcher-stats-cell">HA</th>
+                    <th class="pitcher-stats-cell">K</th>
+                    <th class="pitcher-stats-cell">BBI</th>
+                    <th class="pitcher-stats-cell">BB9</th>
+                    <th class="pitcher-stats-cell">K9</th>
+                    <th class="pitcher-stats-cell">WHIP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in pitching_teams %}
+                <tr>
+                    <td class="pitcher-stats-cell team-name">{{ team.BUTeam }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.APP|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.GS|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.QS|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%.1f"|format(team.INN|float) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.ER|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%.2f"|format(team.ERA|float) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.W|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.L|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.S|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.HA|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.K|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%d"|format(team.BBI|int) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%.2f"|format(team.BB9|float) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%.2f"|format(team.K9|float) }}</td>
+                    <td class="pitcher-stats-cell">{{ "%.3f"|format(team.WHIP|float) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

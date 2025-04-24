@@ -81,7 +81,7 @@ def hit_leaders():
 
     # Calculate derived statistics for each player
     for player in players:
-        if player.AB and player.AB > 0:
+        if player.AB and (player.AB + player.BB + player.HP) > 0:
             player.AVG = player.H / player.AB
             player.OBP = (player.H + player.BB + player.HP) / (player.AB + player.BB + player.HP)
             player.SLG = (player.H + player._2B + 2 * player._3B + 3 * player.HR) / player.AB
