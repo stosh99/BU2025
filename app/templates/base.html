@@ -44,6 +44,9 @@
                         <li class="nav-item">
                             <a class="nav-link {% if request.path == '/pitchleadersyest' %}active{% endif %}" href="{{ url_for('main.pitch_leaders_yest') }}">Pitch Leaders Yest</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/games' %}active{% endif %}" href="{{ url_for('main.games') }}">Games</a>
+                        </li>
                     </ul>
                 </div>
             </div>

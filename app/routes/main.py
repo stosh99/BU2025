@@ -2,6 +2,7 @@ from flask import Blueprint, render_template
 from app.models.team import Team
 from app.models.hitter import HitterStats, HitterStats_yest
 from app.models.pitcher import PitcherStats, PitcherStats_yest
+from app.models.games import Games
 from app.extensions import db
 from sqlalchemy import desc
 from datetime import datetime  # Add this import
@@ -315,5 +316,22 @@ def pitch_leaders_yest():
             player.WHIP = 0
 
     return render_template('pitchleadersyest.html', players=players, date=most_recent_date, now=datetime.now())
+
+
+@main.route('/games')
+def games():
+    # Find the most recent date in the games table
+    most_recent_date = db.session.query(db.func.max(Games.Date)).scalar()
+
+    if not most_recent_date:
+        flash("No data available in games table", "warning")
+        return redirect(url_for('main.home'))
+
+    # Get all games for the most recent date, sorted by BUTeam ascending
+    games_data = db.session.query(Games).filter(
+        Games.Date == most_recent_date
+    ).order_by(Games.BUTeam).all()
+
+    return render_template('games.html', games=games_data, date=most_recent_date, now=datetime.now())
 
 
