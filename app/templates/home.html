@@ -4,43 +4,42 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h1 class="mb-4">Standings</h1>
-    <p class="lead">Standings as of {{ date.strftime('%B %d, %Y') }}</p>
-
-    <div class="card w-80">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="thead-dark">
-                        <tr>
-                            <th class="team-column">Team</th>
-                            <th class="stat-column">RC</th>
-                            <th class="stat-column">RA</th>
-                            <th class="stat-column">Win %</th>
-                            <th class="stat-column">Wins</th>
-                            <th class="stat-column">Losses</th>
-                            <th class="stat-column">Gms Bck</th>
-                            <th class="stat-column">Last 6 W</th>
-                            <th class="stat-column">Last 6 L</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for team in teams %}
-                        <tr>
-                            <td class="team-column">{{ team.BUTeam }}</td>
-                            <td class="stat-column">{{ "%.2f"|format(team.RC|float) }}</td>
-                            <td class="stat-column">{{ "%.2f"|format(team.RA|float) }}</td>
-                            <td class="stat-column">{{ "%.3f"|format(team.WP|float) }}</td>
-                            <td class="stat-column">{{ "%.2f"|format(team.Wins|float) }}</td>
-                            <td class="stat-column">{{ "%.2f"|format(team.Losses|float) }}</td>
-                            <td class="stat-column">{{ "%.2f"|format(team.GamesBack|float) }}</td>
-                            <td class="stat-column">{{ "%.2f"|format(team.Last6W|float) }}</td>
-                            <td class="stat-column">{{ "%.2f"|format(team.Last6L|float) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <div class="d-flex justify-content-between align-items-center mb-3 w-75">
+        <h1 class="mb-0">Standings</h1>
+        <p class="lead m-0">Stats as of {{ date.strftime('%B %d, %Y') }}</p>
+    </div>
+    <div class="w-75">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th class="team-column">Team</th>
+                        <th class="stat-column">RC</th>
+                        <th class="stat-column">RA</th>
+                        <th class="stat-column">Win %</th>
+                        <th class="stat-column">Wins</th>
+                        <th class="stat-column">Losses</th>
+                        <th class="stat-column">Gms Bck</th>
+                        <th class="stat-column">Last 6 W</th>
+                        <th class="stat-column">Last 6 L</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for team in teams %}
+                    <tr>
+                        <td class="team-column">{{ team.BUTeam }}</td>
+                        <td class="stat-column">{{ "%.2f"|format(team.RC|float) }}</td>
+                        <td class="stat-column">{{ "%.2f"|format(team.RA|float) }}</td>
+                        <td class="stat-column">{{ "%.3f"|format(team.WP|float) }}</td>
+                        <td class="stat-column">{{ "%.2f"|format(team.Wins|float) }}</td>
+                        <td class="stat-column">{{ "%.2f"|format(team.Losses|float) }}</td>
+                        <td class="stat-column">{{ "%.2f"|format(team.GamesBack|float) }}</td>
+                        <td class="stat-column">{{ "%.2f"|format(team.Last6W|float) }}</td>
+                        <td class="stat-column">{{ "%.2f"|format(team.Last6L|float) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

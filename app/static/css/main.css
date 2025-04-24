@@ -40,3 +40,4 @@
 .pitcher-stats-cell:not(.team-name) {
     width: calc((100% - 15%) / 15); /* Divides remaining 85% among 15 stat columns */
 }
+
