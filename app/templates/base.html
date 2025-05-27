@@ -47,6 +47,20 @@
                         <li class="nav-item">
                             <a class="nav-link {% if request.path == '/games' %}active{% endif %}" href="{{ url_for('main.games') }}">Games</a>
                         </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="myTeamHitDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                MyTeamHit
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="myTeamHitDropdown">
+                                {% if bu_teams %}
+                                    {% for team_name in bu_teams %}
+                                    <li><a class="dropdown-item" href="{{ url_for('main.my_team_hit_stats', team_name=team_name) }}">{{ team_name }}</a></li>
+                                    {% endfor %}
+                                {% else %}
+                                    <li><a class="dropdown-item" href="#">No teams available</a></li>
+                                {% endif %}
+                            </ul>
+                        </li>
                     </ul>
                 </div>
             </div>
