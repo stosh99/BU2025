@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}My Team - {{ team_name }} Stats{% endblock %}
+
+{% block content %}
+<div class="container mt-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">My Team - {{ team_name }}</h1>
+        {% if date %}
+        <p class="lead m-0">Stats as of {{ date.strftime('%B %d, %Y') }}</p>
+        {% endif %}
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover full-width-table">
+            <thead class="thead-dark">
+                <tr>
+                    <th class="stats-cell team-name">Player</th>
+                    <th class="stats-cell">AB</th>
+                    <th class="stats-cell">H</th>
+                    <th class="stats-cell">2B</th>
+                    <th class="stats-cell">3B</th>
+                    <th class="stats-cell">HR</th>
+                    <th class="stats-cell">BB</th>
+                    <th class="stats-cell">HP</th>
+                    <th class="stats-cell">SB</th>
+                    <th class="stats-cell">CS</th>
+                    <th class="stats-cell">E</th>
+                    <th class="stats-cell">AVG</th>
+                    <th class="stats-cell">OBP</th>
+                    <th class="stats-cell">SLG</th>
+                    <th class="stats-cell">OPS</th>
+                    <th class="stats-cell">RC</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if players %}
+                    {% for player in players %}
+                    <tr>
+                        <td class="stats-cell team-name">{{ player.clean_name if player.clean_name else player.Player }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player.AB|int) }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player.H|int) }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player._2B|int) }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player._3B|int) }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player.HR|int) }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player.BB|int) }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player.HP|int) }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player.SB|int) }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player.CS|int) }}</td>
+                        <td class="stats-cell">{{ "%d"|format(player.E|int) }}</td>
+                        <td class="stats-cell">{{ "%.3f"|format(player.AVG|float) }}</td>
+                        <td class="stats-cell">{{ "%.3f"|format(player.OBP|float) }}</td>
+                        <td class="stats-cell">{{ "%.3f"|format(player.SLG|float) }}</td>
+                        <td class="stats-cell">{{ "%.3f"|format(player.OPS|float) }}</td>
+                        <td class="stats-cell">{{ "%.2f"|format(player.RC|float) }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="16" class="text-center">No player data available for this team.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
