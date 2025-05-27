@@ -11,6 +11,22 @@ from datetime import datetime  # Add this import
 main = Blueprint('main', __name__)
 
 
+@main.context_processor
+def inject_bu_teams():
+    try:
+        # Get the most recent date to ensure teams are current
+        most_recent_date = db.session.query(db.func.max(Team.Date)).scalar()
+        if most_recent_date:
+            teams = db.session.query(Team.BUTeam).filter_by(Date=most_recent_date).distinct().order_by(Team.BUTeam).all()
+            # Extract the string values from the Row objects
+            team_names = [team[0] for team in teams]
+            return dict(bu_teams=team_names)
+        return dict(bu_teams=[]) # Return empty list if no date or teams
+    except Exception as e:
+        print(f"Error fetching BU teams: {e}") # Optional: for debugging
+        return dict(bu_teams=[]) # Return empty on error
+
+
 @main.route('/')
 def home():
     # Get the most recent date in the teamstat table
@@ -333,5 +349,52 @@ def games():
     ).order_by(Games.BUTeam).all()
 
     return render_template('games.html', games=games_data, date=most_recent_date, now=datetime.now())
+
+
+@main.route('/my-team-hit/<team_name>')
+def my_team_hit_stats(team_name):
+    most_recent_date = db.session.query(db.func.max(Team.Date)).scalar()
+    if not most_recent_date:
+        # Handle case where no date is found, maybe flash a message and redirect
+        # For now, can pass empty players list or handle in template
+        players = []
+    else:
+        players = db.session.query(HitterStats).filter(
+            HitterStats.Date == most_recent_date,
+            HitterStats.BUTeam == team_name
+        ).order_by(desc(HitterStats.RC)).all()
+
+        for player in players:
+            # Clean player name (if necessary, like in pitch_leaders)
+            if player.Player:
+                player.clean_name = player.Player.replace('\xa0', ' ').replace('\u00A0', ' ')
+                player.clean_name = ''.join(c if c.isprintable() else ' ' for c in player.clean_name)
+                player.clean_name = ' '.join(player.clean_name.split())
+            else:
+                player.clean_name = '' # Or 'Unknown Player'
+
+            if player.AB and player.AB > 0:
+                player.AVG = player.H / player.AB
+                player.SLG = (player.H + player._2B + 2 * player._3B + 3 * player.HR) / player.AB
+                # OBP calculation needs (AB + BB + HP) in denominator
+                if (player.AB + player.BB + player.HP) > 0:
+                    player.OBP = (player.H + player.BB + player.HP) / (player.AB + player.BB + player.HP)
+                else:
+                    player.OBP = 0.0
+                player.OPS = player.OBP + player.SLG
+            else:
+                player.AVG = 0.0
+                player.OBP = 0.0
+                player.SLG = 0.0
+                player.OPS = 0.0
+            # Ensure RC is present or set to 0.0 if not calculated elsewhere
+            if not hasattr(player, 'RC') or player.RC is None:
+                player.RC = 0.0
+
+    return render_template('my_team_hit_stats.html',
+                           players=players,
+                           team_name=team_name,
+                           date=most_recent_date,
+                           now=datetime.now())
 
 
