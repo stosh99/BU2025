@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}My Team - {{ team_name }} Pitcher Stats{% endblock %}
+
+{% block content %}
+<div class="container mt-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">My Team - {{ team_name }} Pitching</h1>
+        {% if date %}
+        <p class="lead m-0">Stats as of {{ date.strftime('%B %d, %Y') }}</p>
+        {% endif %}
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover full-width-table">
+            <thead class="thead-dark">
+                <tr>
+                    <th class="pitcher-stats-cell team-name">Player</th>
+                    <th class="pitcher-stats-cell">APP</th>
+                    <th class="pitcher-stats-cell">GS</th>
+                    <th class="pitcher-stats-cell">QS</th>
+                    <th class="pitcher-stats-cell">INN</th>
+                    <th class="pitcher-stats-cell">ER</th>
+                    <th class="pitcher-stats-cell">ERA</th>
+                    <th class="pitcher-stats-cell">W</th>
+                    <th class="pitcher-stats-cell">L</th>
+                    <th class="pitcher-stats-cell">S</th>
+                    <th class="pitcher-stats-cell">HA</th>
+                    <th class="pitcher-stats-cell">K</th>
+                    <th class="pitcher-stats-cell">BB</th> <!-- Will display BBI -->
+                    <th class="pitcher-stats-cell">BB9</th>
+                    <th class="pitcher-stats-cell">K9</th>
+                    <th class="pitcher-stats-cell">WHIP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if players %}
+                    {% for player in players %}
+                    <tr>
+                        <td class="pitcher-stats-cell team-name">{{ player.clean_name }}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.APP|int) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.GS|int) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.QS|int) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%.1f"|format(player.INN|float) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.ER|int) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%.2f"|format(player.ERA|float) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.W|int)}}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.L|int) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.S|int) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.HA|int)}}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.K|int) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%d"|format(player.BBI|int) }}</td> <!-- BBI is base on balls issued (Walks) -->
+                        <td class="pitcher-stats-cell">{{ "%.2f"|format(player.BB9|float) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%.2f"|format(player.K9|float) }}</td>
+                        <td class="pitcher-stats-cell">{{ "%.3f"|format(player.WHIP|float) }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="16" class="text-center">No player pitching data available for this team.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
