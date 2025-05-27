@@ -61,6 +61,20 @@
                                 {% endif %}
                             </ul>
                         </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="myTeamPitchDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                MyTeamPitch
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="myTeamPitchDropdown">
+                                {% if bu_teams %}
+                                    {% for team_name in bu_teams %}
+                                    <li><a class="dropdown-item" href="{{ url_for('main.my_team_pitch_stats', team_name=team_name) }}">{{ team_name }}</a></li>
+                                    {% endfor %}
+                                {% else %}
+                                    <li><a class="dropdown-item" href="#">No teams available</a></li>
+                                {% endif %}
+                            </ul>
+                        </li>
                     </ul>
                 </div>
             </div>

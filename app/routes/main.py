@@ -398,3 +398,60 @@ def my_team_hit_stats(team_name):
                            now=datetime.now())
 
 
+@main.route('/my-team-pitch/<team_name>')
+def my_team_pitch_stats(team_name):
+    most_recent_date = db.session.query(db.func.max(Team.Date)).scalar()
+    if not most_recent_date:
+        players = []
+    else:
+        players = db.session.query(PitcherStats).filter(
+            PitcherStats.Date == most_recent_date,
+            PitcherStats.BUTeam == team_name
+        ).order_by(PitcherStats.ERA).all() # Order by ERA ascending
+
+        for player in players:
+            # Clean player name
+            if player.Player:
+                player.clean_name = player.Player.replace('\xa0', ' ').replace('\u00A0', ' ')
+                player.clean_name = ''.join(c if c.isprintable() else ' ' for c in player.clean_name)
+                player.clean_name = ' '.join(player.clean_name.split())
+            else:
+                player.clean_name = 'Unknown Pitcher'
+
+            # Calculate BB/9, K/9, WHIP
+            # Ensure BBI, K, HA are not None before calculation
+            bbi = player.BBI or 0
+            k = player.K or 0
+            ha = player.HA or 0
+            inn = player.INN or 0.0 # ensure INN is float for division
+
+            if inn > 0:
+                player.BB9 = bbi * 9 / inn
+                player.K9 = k * 9 / inn
+                player.WHIP = (bbi + ha) / inn
+            else:
+                player.BB9 = 0.0
+                player.K9 = 0.0
+                player.WHIP = 0.0
+            
+            # Ensure other core stats are not None for display
+            player.APP = player.APP or 0
+            player.GS = player.GS or 0
+            player.QS = player.QS or 0
+            player.INN = inn # Already defaulted to 0.0 if None
+            player.ER = player.ER or 0
+            player.ERA = player.ERA or 0.0
+            player.W = player.W or 0
+            player.L = player.L or 0
+            player.S = player.S or 0
+            player.HA = ha # Already defaulted
+            player.K = k   # Already defaulted
+            player.BBI = bbi # Already defaulted
+
+    return render_template('my_team_pitch_stats.html', 
+                           players=players, 
+                           team_name=team_name, 
+                           date=most_recent_date, 
+                           now=datetime.now())
+
+
