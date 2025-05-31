@@ -1,6 +1,12 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
 from app.models.team import Team
 from app.models.hitter import HitterStats, HitterStats_yest
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+import pandas as pd
 from app.models.pitcher import PitcherStats, PitcherStats_yest
 from app.models.games import Games
 from app.extensions import db
@@ -256,6 +262,42 @@ def teamstatsyest():
                            now=datetime.now())
 
 
+@main.route('/hitter-analysis', methods=['GET'])
+def hitter_analysis():
+    most_recent_date = db.session.query(db.func.max(HitterStats.Date)).scalar()
+    players_query = db.session.query(HitterStats.Player).filter(HitterStats.Date == most_recent_date).distinct().order_by(HitterStats.Player).all()
+    players = [player[0] for player in players_query]
+
+    selected_player_name = request.args.get('player_name')
+    plot_url = None
+
+    if selected_player_name:
+        player_stats = db.session.query(HitterStats.Date, HitterStats.RC).filter(HitterStats.Player == selected_player_name).order_by(HitterStats.Date).all()
+
+        if player_stats:
+            df = pd.DataFrame(player_stats, columns=['Date', 'RC'])
+            df['Date'] = pd.to_datetime(df['Date'])
+            df['RC'] = pd.to_numeric(df['RC'])
+            df = df.sort_values(by='Date')
+            df['RC_MA'] = df['RC'].rolling(window=7, min_periods=1).mean()
+
+            plt.figure(figsize=(10, 6))
+            plt.plot(df['Date'], df['RC'], marker='o', linestyle='-', label='RC')
+            plt.plot(df['Date'], df['RC_MA'], marker='', linestyle='--', label='7-Day Moving Avg RC')
+            plt.xlabel('Date')
+            plt.ylabel('RC (Runs Created)')
+            plt.title(f'RC Over Time for {selected_player_name}')
+            plt.legend()
+            plt.grid(True)
+            plt.gcf().autofmt_xdate()
+
+            img = BytesIO()
+            plt.savefig(img, format='png', bbox_inches='tight')
+            plt.close()
+            img.seek(0)
+            plot_url = base64.b64encode(img.getvalue()).decode()
+
+    return render_template('HitterAnalysis.html', players=players, plot_url=plot_url, selected_player_name=selected_player_name, date=most_recent_date, now=datetime.now())
 @main.route('/hitleadersyest')
 def hit_leaders_yest():
     most_recent_date = db.session.query(db.func.max(HitterStats_yest.Date)).scalar()
