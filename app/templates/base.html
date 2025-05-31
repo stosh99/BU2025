@@ -47,6 +47,9 @@
                         <li class="nav-item">
                             <a class="nav-link {% if request.path == '/games' %}active{% endif %}" href="{{ url_for('main.games') }}">Games</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == url_for('main.hitter_analysis') %}active{% endif %}" href="{{ url_for('main.hitter_analysis') }}">Hitter Analysis</a>
+                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="myTeamHitDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 MyTeamHit
