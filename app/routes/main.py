@@ -265,7 +265,9 @@ def teamstatsyest():
 @main.route('/hitter-analysis', methods=['GET'])
 def hitter_analysis():
     most_recent_date = db.session.query(db.func.max(HitterStats.Date)).scalar()
-    players_query = db.session.query(HitterStats.Player).filter(HitterStats.Date == most_recent_date).distinct().order_by(HitterStats.Player).all()
+    games_threshold_query = db.session.query(db.func.max(Team.BUGames)).filter(Team.Date == most_recent_date).scalar()
+    games_threshold = games_threshold_query if games_threshold_query is not None else 0
+    players_query = db.session.query(HitterStats.Player).filter(HitterStats.Date == most_recent_date, HitterStats.AB > games_threshold).distinct().order_by(HitterStats.Player).all()
     players = [player[0] for player in players_query]
 
     selected_player_name = request.args.get('player_name')
