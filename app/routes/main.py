@@ -293,7 +293,7 @@ def hitter_analysis():
             plt.grid(True)
             plt.gcf().autofmt_xdate()
 
-            plt.ylim(bottom=0, top=10.0) # <-- ADD THIS LINE
+            plt.ylim(bottom=2.0, top=8.0)
 
             img = BytesIO()
             plt.savefig(img, format='png', bbox_inches='tight')
