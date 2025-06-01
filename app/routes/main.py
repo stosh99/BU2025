@@ -302,6 +302,49 @@ def hitter_analysis():
             plot_url = base64.b64encode(img.getvalue()).decode()
 
     return render_template('HitterAnalysis.html', players=players, plot_url=plot_url, selected_player_name=selected_player_name, date=most_recent_date, now=datetime.now())
+
+@main.route('/pitcher-analysis', methods=['GET'])
+def pitcher_analysis():
+    most_recent_date = db.session.query(db.func.max(PitcherStats.Date)).scalar()
+    games_threshold_query = db.session.query(db.func.max(Team.BUGames)).filter(Team.Date == most_recent_date).scalar()
+    games_threshold = games_threshold_query if games_threshold_query is not None else 0
+    innings_qualifying_threshold = games_threshold * 0.617
+    players_query = db.session.query(PitcherStats.Player).filter(PitcherStats.Date == most_recent_date, PitcherStats.INN > innings_qualifying_threshold).distinct().order_by(PitcherStats.Player).all()
+    players = [player[0] for player in players_query]
+
+    selected_player_name = request.args.get('player_name')
+    plot_url = None
+
+    if selected_player_name:
+        player_stats = db.session.query(PitcherStats.Date, PitcherStats.ERA).filter(PitcherStats.Player == selected_player_name).order_by(PitcherStats.Date).all()
+
+        if player_stats:
+            df = pd.DataFrame(player_stats, columns=['Date', 'ERA'])
+            df['Date'] = pd.to_datetime(df['Date'])
+            df['ERA'] = pd.to_numeric(df['ERA'])
+            df = df.sort_values(by='Date')
+            df['ERA_MA'] = df['ERA'].rolling(window=7, min_periods=1).mean()
+
+            plt.figure(figsize=(10, 6))
+            plt.plot(df['Date'], df['ERA'], marker='o', linestyle='-', label='ERA')
+            plt.plot(df['Date'], df['ERA_MA'], marker='', linestyle='--', label='7-Day Moving Avg ERA')
+            plt.xlabel('Date')
+            plt.ylabel('ERA (Earned Run Average)')
+            plt.title(f'ERA Over Time for {selected_player_name}')
+            plt.legend()
+            plt.grid(True)
+            plt.gcf().autofmt_xdate()
+
+            plt.ylim(bottom=0, top=5.0)
+
+            img = BytesIO()
+            plt.savefig(img, format='png', bbox_inches='tight')
+            plt.close()
+            img.seek(0)
+            plot_url = base64.b64encode(img.getvalue()).decode()
+
+    return render_template('PitcherAnalysis.html', players=players, plot_url=plot_url, selected_player_name=selected_player_name, date=most_recent_date, now=datetime.now())
+
 @main.route('/hitleadersyest')
 def hit_leaders_yest():
     most_recent_date = db.session.query(db.func.max(HitterStats_yest.Date)).scalar()
