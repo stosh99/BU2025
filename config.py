@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 import sshtunnel
 
@@ -8,7 +9,8 @@ load_dotenv()
 
 class Config:
     # Flask settings
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
+    SEASON_YEAR = int(os.environ.get('SEASON_YEAR', datetime.now().year))
 
     # Initialize class variables
     tunnel = None

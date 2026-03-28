@@ -5,7 +5,12 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 w-75">
-        <h1 class="mb-0">Standings</h1>
+        <div>
+            <h1 class="mb-0 d-inline">Standings</h1>
+            {% if xfactor is not none %}
+            <span class="ms-3" style="font-size: 0.75em; vertical-align: middle;">Xfactor={{ "%.2f"|format(xfactor|float) }}</span>
+            {% endif %}
+        </div>
         <p class="lead m-0">Stats as of {{ date.strftime('%B %d, %Y') }}</p>
     </div>
     <div class="w-75">

@@ -7,14 +7,10 @@ from app.models.team import Team
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
-migrate = Migrate(app, db)
+migrate_instance = Migrate(app, db)
 
-# Import models so they're detected by Alembic
-# Add all your models here
-#
-#
-#
-# Create the migrations directory
+with app.app_context():
+    # Create the migrations directory
     init()
 
     # Create a migration

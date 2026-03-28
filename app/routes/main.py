@@ -1,260 +1,228 @@
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
 from app.models.team import Team
 from app.models.hitter import HitterStats, HitterStats_yest
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from io import BytesIO
-import base64
-import pandas as pd
 from app.models.pitcher import PitcherStats, PitcherStats_yest
 from app.models.games import Games
 from app.extensions import db
+from app.services.stats import calc_hitting_stats, calc_pitching_stats, clean_player_name
+from app.services.charts import generate_player_chart
 from sqlalchemy import desc
-from datetime import datetime  # Add this import
+from datetime import datetime
 
+# Qualifying thresholds
+HITTING_AB_MULTIPLIER = 2
+PITCHING_INN_QUALIFIER = 0.617
+PITCHER_MIN_INNINGS = 0.1
+MOVING_AVG_WINDOW = 7
 
 main = Blueprint('main', __name__)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _get_season_year():
+    """Return the configured season year, falling back to current calendar year."""
+    return current_app.config.get('SEASON_YEAR', datetime.now().year)
+
+
+def _year_filter(date_column):
+    """Return a SQLAlchemy filter expression restricting date_column to the season year."""
+    return db.extract('year', date_column) == _get_season_year()
+
+
+def _get_most_recent_date():
+    """Return the most recent date from the Team table for the current season, or None."""
+    record = Team.query.filter(
+        _year_filter(Team.Date)
+    ).order_by(desc(Team.Date)).first()
+    return record.Date if record else None
+
+
+def _max_bu_games(date):
+    """Return max BUGames for a given date, defaulting to 0."""
+    val = db.session.query(db.func.max(Team.BUGames)).filter(Team.Date == date).scalar()
+    return val if val is not None else 0
+
+
+def _max_date_for_model(model):
+    """Return the most recent date for a model filtered by season year, or None."""
+    return db.session.query(db.func.max(model.Date)).filter(
+        _year_filter(model.Date)
+    ).scalar()
+
+
+def _get_season_start_date():
+    """Return the earliest date from CubsSchedule2025 for the current season year, or None."""
+    year = _get_season_year()
+    result = db.session.execute(
+        db.text("SELECT MIN(STR_TO_DATE(Date, '%m/%d/%Y')) FROM CubsSchedule2025 WHERE YEAR(STR_TO_DATE(Date, '%m/%d/%Y')) = :year"),
+        {'year': year}
+    ).scalar()
+    return result
 
 
 @main.context_processor
 def inject_bu_teams():
     try:
-        # Get the most recent date to ensure teams are current
-        most_recent_date = db.session.query(db.func.max(Team.Date)).scalar()
+        most_recent_date = _max_date_for_model(Team)
         if most_recent_date:
             teams = db.session.query(Team.BUTeam).filter_by(Date=most_recent_date).distinct().order_by(Team.BUTeam).all()
-            # Extract the string values from the Row objects
-            team_names = [team[0] for team in teams]
-            return dict(bu_teams=team_names)
-        return dict(bu_teams=[]) # Return empty list if no date or teams
-    except Exception as e:
-        print(f"Error fetching BU teams: {e}") # Optional: for debugging
-        return dict(bu_teams=[]) # Return empty on error
+            return dict(bu_teams=[team[0] for team in teams])
+        return dict(bu_teams=[])
+    except Exception:
+        return dict(bu_teams=[])
 
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
 
 @main.route('/')
 def home():
-    # Get the most recent date in the teamstat table
-    most_recent_date = Team.query.order_by(desc(Team.Date)).first().Date
+    most_recent_date = _get_most_recent_date()
+    if not most_recent_date:
+        flash("No team data available", "warning")
+        return render_template('home.html', teams=[], date=None, xfactor=None, now=datetime.now())
 
-    # Get all teams for that date, sorted by WP (Win Percentage) descending
     teams = Team.query.filter_by(Date=most_recent_date).order_by(desc(Team.WP)).all()
 
-    # Pass the current date to the template
-    now = datetime.now()
+    # Get Xfactor for the most recent date from CubsSchedule2025
+    date_str = most_recent_date.strftime('%-m/%-d/%Y')
+    xfactor = db.session.execute(
+        db.text("SELECT Xfactor FROM CubsSchedule2025 WHERE Date = :d"),
+        {'d': date_str}
+    ).scalar()
 
-    return render_template('home.html', teams=teams, date=most_recent_date, now=now)
+    return render_template('home.html', teams=teams, date=most_recent_date, xfactor=xfactor, now=datetime.now())
 
 
 @main.route('/team-stats')
 def team_stats():
-    # Get the most recent date in the teamstat table
-    most_recent_date = Team.query.order_by(desc(Team.Date)).first().Date
+    most_recent_date = _get_most_recent_date()
+    if not most_recent_date:
+        flash("No team data available", "warning")
+        return redirect(url_for('main.home'))
 
-    # Get all teams for that date, sorted by BUTeam ascending
     teams = Team.query.filter_by(Date=most_recent_date).order_by(Team.BUTeam).all()
-
-    # Calculate derived statistics for each team
     for team in teams:
-        # Hitting stats
-        if team.AB and team.AB > 0:  # Avoid division by zero
-            team.AVG = team.H / team.AB
-            team.OBP = (team.H + team.BB + team.HP) / (team.AB + team.BB + team.HP)
-            team.SLG = (team.H + team._2B + 2 * team._3B + 3 * team.HR) / team.AB
-            team.OPS = team.OBP + team.SLG
-        else:
-            team.AVG = 0
-            team.OBP = 0
-            team.SLG = 0
-            team.OPS = 0
-
-        # Pitching stats
-        if team.INN and team.INN > 0:  # Avoid division by zero
-            team.BB9 = team.BBI * 9 / team.INN
-            team.K9 = team.K * 9 / team.INN
-            team.WHIP = (team.BBI + team.HA) / team.INN
-        else:
-            team.BB9 = 0
-            team.K9 = 0
-            team.WHIP = 0
+        calc_hitting_stats(team)
+        calc_pitching_stats(team)
 
     return render_template('teamstats.html', teams=teams, date=most_recent_date, now=datetime.now())
 
 
 @main.route('/hitleaders')
 def hit_leaders():
-    # Import the hitterStats model at the top of your file if not already there
-    # from app.models.hitter import HitterStats
+    most_recent_date = _get_most_recent_date()
+    if not most_recent_date:
+        flash("No team data available", "warning")
+        return redirect(url_for('main.home'))
 
-    # First get the latest date
-    most_recent_date = Team.query.order_by(desc(Team.Date)).first().Date
+    qualifying_abs = HITTING_AB_MULTIPLIER * _max_bu_games(most_recent_date)
 
-    # Get the maximum BUGames value for qualifying
-    max_games_query = db.session.query(db.func.max(Team.BUGames)).filter(Team.Date == most_recent_date).scalar()
-    qualifying_abs = 2 * max_games_query  # This is your 2 * max(BUGames) calculation
-
-    # Query for players with at least the qualifying number of at-bats
-    # You'll need to adjust this query based on your actual model for hitter stats
     players = db.session.query(HitterStats).filter(
         HitterStats.Date == most_recent_date,
         HitterStats.AB >= qualifying_abs
-    ).order_by(desc(HitterStats.RC)).all()
+    ).order_by(desc(HitterStats.RC), desc(HitterStats.AB)).all()
 
-    # Calculate derived statistics for each player
     for player in players:
-        if player.AB and (player.AB + player.BB + player.HP) > 0:
-            player.AVG = player.H / player.AB
-            player.OBP = (player.H + player.BB + player.HP) / (player.AB + player.BB + player.HP)
-            player.SLG = (player.H + player._2B + 2 * player._3B + 3 * player.HR) / player.AB
-            player.OPS = player.OBP + player.SLG
-        else:
-            player.AVG = 0
-            player.OBP = 0
-            player.SLG = 0
-            player.OPS = 0
+        calc_hitting_stats(player)
 
     return render_template('hitleaders.html', players=players, date=most_recent_date, now=datetime.now())
 
 
 @main.route('/pitchleaders')
 def pitch_leaders():
-    # First get the latest date
-    most_recent_date = Team.query.order_by(desc(Team.Date)).first().Date
+    most_recent_date = _get_most_recent_date()
+    if not most_recent_date:
+        flash("No team data available", "warning")
+        return redirect(url_for('main.home'))
 
-    # Get the maximum BUGames value for qualifying
-    max_games_query = db.session.query(db.func.max(Team.BUGames)).filter(Team.Date == most_recent_date).scalar()
-    qualifying_innings = 0.617 * max_games_query  # Half of max BUGames
+    qualifying_innings = PITCHING_INN_QUALIFIER * _max_bu_games(most_recent_date)
 
-    # Query for pitchers with at least the qualifying number of innings
-    # Using your specified query
     players = db.session.query(PitcherStats).filter(
         PitcherStats.Date == most_recent_date,
         PitcherStats.INN >= qualifying_innings
-    ).order_by(PitcherStats.ERA).all()  # Ordering by ERA (lower is better)
+    ).order_by(PitcherStats.ERA, desc(PitcherStats.INN)).all()
 
-    # Calculate derived statistics for each pitcher
     for player in players:
-        # Clean player name
-        if player.Player:
-            player.clean_name = player.Player.replace('\xa0', ' ').replace('\u00A0', ' ')
-            player.clean_name = ''.join(c if c.isprintable() else ' ' for c in player.clean_name)
-            player.clean_name = ' '.join(player.clean_name.split())
-        else:
-            player.clean_name = ''
-
-        # Calculate BB/9 and K/9
-        if player.INN and player.INN > 0:
-            player.BB9 = player.BBI * 9 / player.INN
-            player.K9 = player.K * 9 / player.INN
-            player.WHIP = (player.BBI + player.HA) / player.INN
-        else:
-            player.BB9 = 0
-            player.K9 = 0
-            player.WHIP = 0
+        player.clean_name = clean_player_name(player.Player)
+        calc_pitching_stats(player)
 
     return render_template('pitchleaders.html', players=players, date=most_recent_date, now=datetime.now())
 
 
 @main.route('/teamstatsyest')
 def teamstatsyest():
-    # Find the two most recent dates in the teamstat table
-    recent_dates = db.session.query(Team.Date).distinct().order_by(desc(Team.Date)).limit(2).all()
+    year = _get_season_year()
+    recent_dates = db.session.query(Team.Date).filter(
+        _year_filter(Team.Date)
+    ).distinct().order_by(desc(Team.Date)).limit(2).all()
 
     if len(recent_dates) < 2:
-        # Not enough dates for comparison
         flash("Need at least two dates with data to calculate changes", "warning")
         return redirect(url_for('main.team_stats'))
 
     most_recent_date = recent_dates[0][0]
     previous_date = recent_dates[1][0]
 
-    # Get team data for both dates
-    current_teams = {team.BUTeam: team for team in Team.query.filter_by(Date=most_recent_date).all()}
-    previous_teams = {team.BUTeam: team for team in Team.query.filter_by(Date=previous_date).all()}
+    current_teams = {t.BUTeam: t for t in Team.query.filter_by(Date=most_recent_date).all()}
+    previous_teams = {t.BUTeam: t for t in Team.query.filter_by(Date=previous_date).all()}
 
-    # Calculate differences
     team_changes = []
     for buteam, current in current_teams.items():
-        if buteam in previous_teams:
-            # Create a new object to hold the changes
-            changes = type('TeamChanges', (), {})()
-            changes.BUTeam = buteam
+        if buteam not in previous_teams:
+            continue
 
-            # Hitting stats changes
-            changes.G = current.G - previous_teams[buteam].G if current.G and previous_teams[buteam].G else 0
-            changes.AB = current.AB - previous_teams[buteam].AB if current.AB and previous_teams[buteam].AB else 0
-            changes.H = current.H - previous_teams[buteam].H if current.H and previous_teams[buteam].H else 0
-            changes._2B = current._2B - previous_teams[buteam]._2B if current._2B and previous_teams[buteam]._2B else 0
-            changes._3B = current._3B - previous_teams[buteam]._3B if current._3B and previous_teams[buteam]._3B else 0
-            changes.HR = current.HR - previous_teams[buteam].HR if current.HR and previous_teams[buteam].HR else 0
-            changes.BB = current.BB - previous_teams[buteam].BB if current.BB and previous_teams[buteam].BB else 0
-            changes.HP = current.HP - previous_teams[buteam].HP if current.HP and previous_teams[buteam].HP else 0
-            changes.SB = current.SB - previous_teams[buteam].SB if current.SB and previous_teams[buteam].SB else 0
-            changes.CS = current.CS - previous_teams[buteam].CS if current.CS and previous_teams[buteam].CS else 0
-            changes.E = current.E - previous_teams[buteam].E if current.E and previous_teams[buteam].E else 0
-            changes.KO = current.KO - previous_teams[buteam].KO if current.KO and previous_teams[buteam].KO else 0
-            changes.RC = current.RC - previous_teams[buteam].RC if current.RC and previous_teams[buteam].RC else 0
-            changes.OPS = current.OPS - previous_teams[buteam].OPS if current.OPS and previous_teams[buteam].OPS else 0
+        prev = previous_teams[buteam]
+        changes = type('TeamChanges', (), {})()
+        changes.BUTeam = buteam
 
-            # Pitching stats changes
-            changes.APP = current.APP - previous_teams[buteam].APP if current.APP and previous_teams[buteam].APP else 0
-            changes.GS = current.GS - previous_teams[buteam].GS if current.GS and previous_teams[buteam].GS else 0
-            changes.QS = current.QS - previous_teams[buteam].QS if current.QS and previous_teams[buteam].QS else 0
-            changes.INN = current.INN - previous_teams[buteam].INN if current.INN and previous_teams[buteam].INN else 0
-            changes.ER = current.ER - previous_teams[buteam].ER if current.ER and previous_teams[buteam].ER else 0
-            changes.RA = current.RA - previous_teams[buteam].RA if current.RA and previous_teams[buteam].RA else 0
-            changes.ERA = current.ERA - previous_teams[buteam].ERA if current.ERA and previous_teams[buteam].ERA else 0
-            changes.HA = current.HA - previous_teams[buteam].HA if current.HA and previous_teams[buteam].HA else 0
-            changes.K = current.K - previous_teams[buteam].K if current.K and previous_teams[buteam].K else 0
-            changes.BBI = current.BBI - previous_teams[buteam].BBI if current.BBI and previous_teams[buteam].BBI else 0
-            changes.W = current.W - previous_teams[buteam].W if current.W and previous_teams[buteam].W else 0
-            changes.L = current.L - previous_teams[buteam].L if current.L and previous_teams[buteam].L else 0
-            changes.S = current.S - previous_teams[buteam].S if current.S and previous_teams[buteam].S else 0
+        # Compute deltas for all stat fields
+        hitting_fields = ['G', 'AB', 'H', '_2B', '_3B', 'HR', 'BB', 'HP', 'SB', 'CS', 'E', 'KO', 'RC', 'OPS']
+        pitching_fields = ['APP', 'GS', 'QS', 'INN', 'ER', 'RA', 'ERA', 'HA', 'K', 'BBI', 'W', 'L', 'S']
 
-            # Derived pitching stats
-            if changes.INN and changes.INN > 0:
-                changes.BB9 = changes.BBI * 9 / changes.INN
-                changes.K9 = changes.K * 9 / changes.INN
-                changes.WHIP = (changes.BBI + changes.HA) / changes.INN
-                changes.ERA = changes.ER * 9 / changes.INN
-            else:
-                changes.BB9 = 0
-                changes.K9 = 0
-                changes.WHIP = 0
-                changes.ERA = 0
+        for field in hitting_fields + pitching_fields:
+            cur_val = getattr(current, field, None) or 0
+            prev_val = getattr(prev, field, None) or 0
+            setattr(changes, field, cur_val - prev_val)
 
-            if changes.AB != 0:
-                changes.AVG = changes.H / changes.AB
-                changes.SLG = (changes.H + changes._2B + 2 * changes._3B + 3 * changes.HR) / changes.AB
-            else:
-                changes.AVG = 0
-                changes.SLG = 0
+        # Derived pitching stats from deltas
+        calc_pitching_stats(changes)
+        if changes.INN and changes.INN > 0:
+            changes.ERA = changes.ER * 9 / changes.INN
 
-            if changes.AB + changes.BBI + changes.HP != 0:
-                changes.OBP = (changes.H + changes.BBI + changes.HP)/(changes.AB + changes.BBI + changes.HP)
-            else:
-                changes.OBP = 0
+        # Derived hitting stats from deltas
+        if changes.AB != 0:
+            changes.AVG = changes.H / changes.AB
+            changes.SLG = (changes.H + changes._2B + 2 * changes._3B + 3 * changes.HR) / changes.AB
+        else:
+            changes.AVG = 0
+            changes.SLG = 0
 
-            if changes.AB-changes.H+changes.CS != 0:
-                changes.RC = (2*(changes.H+changes._2B+2*changes._3B+3*changes.HR+changes.BBI+changes.HP)+changes.H+changes.SB - .61 * (changes.AB-changes.H+changes.CS)) * 4.12 /(changes.AB-changes.H+changes.CS)
-            else:
-                changes.RC = 0
+        obp_denom = changes.AB + changes.BBI + changes.HP
+        if obp_denom != 0:
+            changes.OBP = (changes.H + changes.BBI + changes.HP) / obp_denom
+        else:
+            changes.OBP = 0
 
-            if changes.AB != 0:
-                changes.SLG = (changes.H + changes._2B + 2 * changes._3B + 3 * changes.HR) / changes.AB
-            else:
-                changes.SLG = 0
+        rc_denom = changes.AB - changes.H + changes.CS
+        if rc_denom != 0:
+            changes.RC = (2 * (changes.H + changes._2B + 2 * changes._3B + 3 * changes.HR + changes.BBI + changes.HP) + changes.H + changes.SB - 0.61 * rc_denom) * 4.12 / rc_denom
+        else:
+            changes.RC = 0
 
-            changes.OPS = changes.OPS + changes.SLG
+        changes.OPS = changes.OBP + changes.SLG
 
-            team_changes.append(changes)
+        team_changes.append(changes)
 
-    hitting_teams = sorted(team_changes, key=lambda x: x.RC, reverse=True)  # Sort by RC descending
-    pitching_teams = sorted(team_changes, key=lambda x: x.ERA)  # Sort by ERA ascending
+    hitting_teams = sorted(team_changes, key=lambda x: x.RC, reverse=True)
+    pitching_teams = sorted(team_changes, key=lambda x: x.ERA)
 
     return render_template('teamstatsyest.html',
-                           teams=team_changes,  # Keep the original for backward compatibility
+                           teams=team_changes,
                            hitting_teams=hitting_teams,
                            pitching_teams=pitching_teams,
                            current_date=most_recent_date,
@@ -264,133 +232,94 @@ def teamstatsyest():
 
 @main.route('/hitter-analysis', methods=['GET'])
 def hitter_analysis():
-    most_recent_date = db.session.query(db.func.max(HitterStats.Date)).scalar()
-    games_threshold_query = db.session.query(db.func.max(Team.BUGames)).filter(Team.Date == most_recent_date).scalar()
-    games_threshold = games_threshold_query if games_threshold_query is not None else 0
-    players_query = db.session.query(HitterStats.Player).filter(HitterStats.Date == most_recent_date, HitterStats.AB > games_threshold).distinct().order_by(HitterStats.Player).all()
-    players = [player[0] for player in players_query]
+    most_recent_date = _max_date_for_model(HitterStats)
+
+    players_query = db.session.query(HitterStats.Player).filter(
+        HitterStats.Date == most_recent_date
+    ).distinct().order_by(HitterStats.Player).all()
+    players = [p[0] for p in players_query]
 
     selected_player_name = request.args.get('player_name')
     plot_url = None
 
     if selected_player_name:
-        player_stats = db.session.query(HitterStats.Date, HitterStats.RC).filter(HitterStats.Player == selected_player_name).order_by(HitterStats.Date).all()
+        season_start = _get_season_start_date()
+        date_filter = HitterStats.Date >= season_start if season_start else _year_filter(HitterStats.Date)
+        player_stats = db.session.query(HitterStats.Date, HitterStats.RC).filter(
+            HitterStats.Player == selected_player_name,
+            date_filter
+        ).order_by(HitterStats.Date).all()
 
-        if player_stats:
-            df = pd.DataFrame(player_stats, columns=['Date', 'RC'])
-            df['Date'] = pd.to_datetime(df['Date'])
-            df['RC'] = pd.to_numeric(df['RC'])
-            df = df.sort_values(by='Date')
-            df['RC_MA'] = df['RC'].rolling(window=7, min_periods=1).mean()
+        plot_url = generate_player_chart(
+            player_stats,
+            columns=['Date', 'RC'],
+            ylabel='RC (Runs Created)',
+            title=f'RC Over Time for {selected_player_name}',
+            ma_label=f'{MOVING_AVG_WINDOW}-Day Moving Avg RC',
+            y_min=2.0, y_max=8.0,
+            window=MOVING_AVG_WINDOW
+        )
 
-            plt.figure(figsize=(10, 6))
-            plt.plot(df['Date'], df['RC'], marker='o', linestyle='-', label='RC')
-            plt.plot(df['Date'], df['RC_MA'], marker='', linestyle='--', label='7-Day Moving Avg RC')
-            plt.xlabel('Date')
-            plt.ylabel('RC (Runs Created)')
-            plt.title(f'RC Over Time for {selected_player_name}')
-            plt.legend()
-            plt.grid(True)
-            plt.gcf().autofmt_xdate()
+    return render_template('HitterAnalysis.html', players=players, plot_url=plot_url,
+                           selected_player_name=selected_player_name, date=most_recent_date, now=datetime.now())
 
-            plt.ylim(bottom=2.0, top=8.0)
-
-            img = BytesIO()
-            plt.savefig(img, format='png', bbox_inches='tight')
-            plt.close()
-            img.seek(0)
-            plot_url = base64.b64encode(img.getvalue()).decode()
-
-    return render_template('HitterAnalysis.html', players=players, plot_url=plot_url, selected_player_name=selected_player_name, date=most_recent_date, now=datetime.now())
 
 @main.route('/pitcher-analysis', methods=['GET'])
 def pitcher_analysis():
-    most_recent_date = db.session.query(db.func.max(PitcherStats.Date)).scalar()
-    games_threshold_query = db.session.query(db.func.max(Team.BUGames)).filter(Team.Date == most_recent_date).scalar()
-    games_threshold = games_threshold_query if games_threshold_query is not None else 0
-    innings_qualifying_threshold = games_threshold * 0.617
-    players_query = db.session.query(PitcherStats.Player).filter(PitcherStats.Date == most_recent_date, PitcherStats.INN > innings_qualifying_threshold).distinct().order_by(PitcherStats.Player).all()
-    players = [player[0] for player in players_query]
+    most_recent_date = _max_date_for_model(PitcherStats)
+
+    players_query = db.session.query(PitcherStats.Player).filter(
+        PitcherStats.Date == most_recent_date
+    ).distinct().order_by(PitcherStats.Player).all()
+    players = [p[0] for p in players_query]
 
     selected_player_name = request.args.get('player_name')
     plot_url = None
 
     if selected_player_name:
-        player_stats = db.session.query(PitcherStats.Date, PitcherStats.ERA).filter(PitcherStats.Player == selected_player_name).order_by(PitcherStats.Date).all()
+        season_start = _get_season_start_date()
+        date_filter = PitcherStats.Date >= season_start if season_start else _year_filter(PitcherStats.Date)
+        player_stats = db.session.query(PitcherStats.Date, PitcherStats.ERA).filter(
+            PitcherStats.Player == selected_player_name,
+            date_filter
+        ).order_by(PitcherStats.Date).all()
 
-        if player_stats:
-            df = pd.DataFrame(player_stats, columns=['Date', 'ERA'])
-            df['Date'] = pd.to_datetime(df['Date'])
-            df['ERA'] = pd.to_numeric(df['ERA'])
-            df = df.sort_values(by='Date')
-            df['ERA_MA'] = df['ERA'].rolling(window=7, min_periods=1).mean()
+        plot_url = generate_player_chart(
+            player_stats,
+            columns=['Date', 'ERA'],
+            ylabel='ERA (Earned Run Average)',
+            title=f'ERA Over Time for {selected_player_name}',
+            ma_label=f'{MOVING_AVG_WINDOW}-Day Moving Avg ERA',
+            y_min=0, y_max=5.0,
+            window=MOVING_AVG_WINDOW
+        )
 
-            plt.figure(figsize=(10, 6))
-            plt.plot(df['Date'], df['ERA'], marker='o', linestyle='-', label='ERA')
-            plt.plot(df['Date'], df['ERA_MA'], marker='', linestyle='--', label='7-Day Moving Avg ERA')
-            plt.xlabel('Date')
-            plt.ylabel('ERA (Earned Run Average)')
-            plt.title(f'ERA Over Time for {selected_player_name}')
-            plt.legend()
-            plt.grid(True)
-            plt.gcf().autofmt_xdate()
+    return render_template('PitcherAnalysis.html', players=players, plot_url=plot_url,
+                           selected_player_name=selected_player_name, date=most_recent_date, now=datetime.now())
 
-            plt.ylim(bottom=0, top=5.0)
-
-            img = BytesIO()
-            plt.savefig(img, format='png', bbox_inches='tight')
-            plt.close()
-            img.seek(0)
-            plot_url = base64.b64encode(img.getvalue()).decode()
-
-    return render_template('PitcherAnalysis.html', players=players, plot_url=plot_url, selected_player_name=selected_player_name, date=most_recent_date, now=datetime.now())
 
 @main.route('/hitleadersyest')
 def hit_leaders_yest():
-    most_recent_date = db.session.query(db.func.max(HitterStats_yest.Date)).scalar()
+    most_recent_date = _max_date_for_model(HitterStats_yest)
 
     if not most_recent_date:
         flash("No data available in HitterStats_yest table", "warning")
         return redirect(url_for('main.home'))
 
-    # Get the maximum BUGames value for qualifying
-    max_games_query = db.session.query(db.func.max(Team.BUGames)) \
-        .filter(Team.Date == most_recent_date).scalar()
-    qualifying_abs = 2 * max_games_query  # This is your 2 * max(BUGames) calculation
-
-    # Query for players with at least the qualifying number of at-bats
     players = db.session.query(HitterStats_yest).filter(
         HitterStats_yest.Date == most_recent_date
-    ).order_by(desc(HitterStats_yest.RC)).all()
+    ).order_by(desc(HitterStats_yest.RC), desc(HitterStats_yest.AB)).all()
 
-    # Calculate derived statistics for each player
     for player in players:
-        # Clean player name
-        if player.Player:
-            player.clean_name = player.Player.replace('\xa0', ' ').replace('\u00A0', ' ')
-            player.clean_name = ''.join(c if c.isprintable() else ' ' for c in player.clean_name)
-            player.clean_name = ' '.join(player.clean_name.split())
-        else:
-            player.clean_name = ''
-
-        if player.AB and player.AB > 0:
-            player.AVG = player.H / player.AB
-            player.OBP = (player.H + player.BB + player.HP) / (player.AB + player.BB + player.HP)
-            player.SLG = (player.H + player._2B + 2 * player._3B + 3 * player.HR) / player.AB
-            player.OPS = player.OBP + player.SLG
-        else:
-            player.AVG = 0
-            player.OBP = 0
-            player.SLG = 0
-            player.OPS = 0
+        player.clean_name = clean_player_name(player.Player)
+        calc_hitting_stats(player)
 
     return render_template('hitleadersyest.html', players=players, date=most_recent_date, now=datetime.now())
 
 
 @main.route('/pitchleadersyest')
 def pitch_leaders_yest():
-    # Find the most recent date in the pitcherStats_yest table
-    most_recent_date = db.session.query(db.func.max(PitcherStats_yest.Date)).scalar()
+    most_recent_date = _max_date_for_model(PitcherStats_yest)
 
     if not most_recent_date:
         flash("No data available in pitcherStats_yest table", "warning")
@@ -398,41 +327,24 @@ def pitch_leaders_yest():
 
     players = db.session.query(PitcherStats_yest).filter(
         PitcherStats_yest.Date == most_recent_date,
-        PitcherStats_yest.INN >= .1
-    ).order_by(PitcherStats_yest.ERA).all()  # Ordering by ERA (lower is better)
+        PitcherStats_yest.INN >= PITCHER_MIN_INNINGS
+    ).order_by(PitcherStats_yest.ERA, desc(PitcherStats_yest.INN)).all()
 
     for player in players:
-        # Clean player name
-        if player.Player:
-            player.clean_name = player.Player.replace('\xa0', ' ').replace('\u00A0', ' ')
-            player.clean_name = ''.join(c if c.isprintable() else ' ' for c in player.clean_name)
-            player.clean_name = ' '.join(player.clean_name.split())
-        else:
-            player.clean_name = ''
-
-        # Calculate BB/9 and K/9
-        if player.INN and player.INN > 0:
-            player.BB9 = player.BBI * 9 / player.INN
-            player.K9 = player.K * 9 / player.INN
-            player.WHIP = (player.BBI + player.HA) / player.INN
-        else:
-            player.BB9 = 0
-            player.K9 = 0
-            player.WHIP = 0
+        player.clean_name = clean_player_name(player.Player)
+        calc_pitching_stats(player)
 
     return render_template('pitchleadersyest.html', players=players, date=most_recent_date, now=datetime.now())
 
 
 @main.route('/games')
 def games():
-    # Find the most recent date in the games table
-    most_recent_date = db.session.query(db.func.max(Games.Date)).scalar()
+    most_recent_date = _max_date_for_model(Games)
 
     if not most_recent_date:
         flash("No data available in games table", "warning")
         return redirect(url_for('main.home'))
 
-    # Get all games for the most recent date, sorted by BUTeam ascending
     games_data = db.session.query(Games).filter(
         Games.Date == most_recent_date
     ).order_by(Games.BUTeam).all()
@@ -442,10 +354,8 @@ def games():
 
 @main.route('/my-team-hit/<team_name>')
 def my_team_hit_stats(team_name):
-    most_recent_date = db.session.query(db.func.max(Team.Date)).scalar()
+    most_recent_date = _get_most_recent_date()
     if not most_recent_date:
-        # Handle case where no date is found, maybe flash a message and redirect
-        # For now, can pass empty players list or handle in template
         players = []
     else:
         players = db.session.query(HitterStats).filter(
@@ -454,93 +364,42 @@ def my_team_hit_stats(team_name):
         ).order_by(desc(HitterStats.RC)).all()
 
         for player in players:
-            # Clean player name (if necessary, like in pitch_leaders)
-            if player.Player:
-                player.clean_name = player.Player.replace('\xa0', ' ').replace('\u00A0', ' ')
-                player.clean_name = ''.join(c if c.isprintable() else ' ' for c in player.clean_name)
-                player.clean_name = ' '.join(player.clean_name.split())
-            else:
-                player.clean_name = '' # Or 'Unknown Player'
-
-            if player.AB and player.AB > 0:
-                player.AVG = player.H / player.AB
-                player.SLG = (player.H + player._2B + 2 * player._3B + 3 * player.HR) / player.AB
-                # OBP calculation needs (AB + BB + HP) in denominator
-                if (player.AB + player.BB + player.HP) > 0:
-                    player.OBP = (player.H + player.BB + player.HP) / (player.AB + player.BB + player.HP)
-                else:
-                    player.OBP = 0.0
-                player.OPS = player.OBP + player.SLG
-            else:
-                player.AVG = 0.0
-                player.OBP = 0.0
-                player.SLG = 0.0
-                player.OPS = 0.0
-            # Ensure RC is present or set to 0.0 if not calculated elsewhere
+            player.clean_name = clean_player_name(player.Player)
+            calc_hitting_stats(player)
             if not hasattr(player, 'RC') or player.RC is None:
                 player.RC = 0.0
 
     return render_template('my_team_hit_stats.html',
-                           players=players,
-                           team_name=team_name,
-                           date=most_recent_date,
-                           now=datetime.now())
+                           players=players, team_name=team_name,
+                           date=most_recent_date, now=datetime.now())
 
 
 @main.route('/my-team-pitch/<team_name>')
 def my_team_pitch_stats(team_name):
-    most_recent_date = db.session.query(db.func.max(Team.Date)).scalar()
+    most_recent_date = _get_most_recent_date()
     if not most_recent_date:
         players = []
     else:
         players = db.session.query(PitcherStats).filter(
             PitcherStats.Date == most_recent_date,
             PitcherStats.BUTeam == team_name
-        ).order_by(PitcherStats.ERA).all() # Order by ERA ascending
+        ).order_by(PitcherStats.ERA).all()
 
         for player in players:
-            # Clean player name
-            if player.Player:
-                player.clean_name = player.Player.replace('\xa0', ' ').replace('\u00A0', ' ')
-                player.clean_name = ''.join(c if c.isprintable() else ' ' for c in player.clean_name)
-                player.clean_name = ' '.join(player.clean_name.split())
-            else:
-                player.clean_name = 'Unknown Pitcher'
+            player.clean_name = clean_player_name(player.Player)
+            calc_pitching_stats(player)
 
-            # Calculate BB/9, K/9, WHIP
-            # Ensure BBI, K, HA are not None before calculation
-            bbi = player.BBI or 0
-            k = player.K or 0
-            ha = player.HA or 0
-            inn = player.INN or 0.0 # ensure INN is float for division
-
-            if inn > 0:
-                player.BB9 = bbi * 9 / inn
-                player.K9 = k * 9 / inn
-                player.WHIP = (bbi + ha) / inn
-            else:
-                player.BB9 = 0.0
-                player.K9 = 0.0
-                player.WHIP = 0.0
-            
-            # Ensure other core stats are not None for display
+            # Default None values for display
             player.APP = player.APP or 0
             player.GS = player.GS or 0
             player.QS = player.QS or 0
-            player.INN = inn # Already defaulted to 0.0 if None
+            player.INN = player.INN or 0.0
             player.ER = player.ER or 0
             player.ERA = player.ERA or 0.0
             player.W = player.W or 0
             player.L = player.L or 0
             player.S = player.S or 0
-            player.HA = ha # Already defaulted
-            player.K = k   # Already defaulted
-            player.BBI = bbi # Already defaulted
 
-    return render_template('my_team_pitch_stats.html', 
-                           players=players, 
-                           team_name=team_name, 
-                           date=most_recent_date, 
-                           now=datetime.now())
-
-
+    return render_template('my_team_pitch_stats.html',
+                           players=players, team_name=team_name,
+                           date=most_recent_date, now=datetime.now())
