@@ -9,6 +9,8 @@ from app.services.charts import generate_player_chart
 from app.services import trade, formulas
 from sqlalchemy import desc
 from datetime import datetime, date, timedelta
+from dataclasses import dataclass
+from functools import wraps
 import time
 
 # Qualifying thresholds
@@ -78,6 +80,110 @@ def inject_bu_teams():
         return dict(bu_teams=[])
 
 
+def require_recent_date(model, message, redirect_to='main.home'):
+    """Decorator: resolve the most recent season date for `model` and inject it
+    as the `most_recent_date` keyword argument. If there is no data, flash
+    `message` and redirect to `redirect_to` instead of calling the view.
+
+    This centralizes the repeated
+        most_recent_date = _max_date_for_model(...)
+        if not most_recent_date: flash(...); return redirect(...)
+    guard that opened almost every route.
+    """
+    def decorator(view):
+        @wraps(view)
+        def wrapper(*args, **kwargs):
+            most_recent_date = _max_date_for_model(model)
+            if not most_recent_date:
+                flash(message, "warning")
+                return redirect(url_for(redirect_to))
+            kwargs['most_recent_date'] = most_recent_date
+            return view(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+@dataclass
+class TeamChanges:
+    """Day-over-day team stat deltas for the teamstatsyest view.
+
+    Replaces the old dynamic ``type('TeamChanges', (), {})()`` object. Fields
+    cover the raw hitting/pitching deltas plus the derived stats computed from
+    them; all default to 0.0 so calc_pitching_stats and the template can read
+    any field safely."""
+    BUTeam: str = ''
+    # Hitting deltas
+    G: float = 0.0
+    AB: float = 0.0
+    H: float = 0.0
+    _2B: float = 0.0
+    _3B: float = 0.0
+    HR: float = 0.0
+    BB: float = 0.0
+    HP: float = 0.0
+    SB: float = 0.0
+    CS: float = 0.0
+    E: float = 0.0
+    KO: float = 0.0
+    RC: float = 0.0
+    OPS: float = 0.0
+    # Pitching deltas
+    APP: float = 0.0
+    GS: float = 0.0
+    QS: float = 0.0
+    INN: float = 0.0
+    ER: float = 0.0
+    RA: float = 0.0
+    ERA: float = 0.0
+    HA: float = 0.0
+    K: float = 0.0
+    BBI: float = 0.0
+    W: float = 0.0
+    L: float = 0.0
+    S: float = 0.0
+    # Derived
+    BB9: float = 0.0
+    K9: float = 0.0
+    WHIP: float = 0.0
+    AVG: float = 0.0
+    SLG: float = 0.0
+    OBP: float = 0.0
+
+
+def _render_hit_leaders(model, most_recent_date, template, min_ab, set_clean_name):
+    """Shared rendering for the season and yesterday hitter-leader pages.
+
+    `min_ab` applies a qualifying at-bat threshold (None = no threshold).
+    `set_clean_name` attaches a cleaned display name (the season page does not)."""
+    query = db.session.query(model).filter(model.Date == most_recent_date)
+    if min_ab is not None:
+        query = query.filter(model.AB >= min_ab)
+    players = query.order_by(desc(model.RC), desc(model.AB)).all()
+
+    for player in players:
+        if set_clean_name:
+            player.clean_name = clean_player_name(player.Player)
+        calc_hitting_stats(player)
+
+    return render_template(template, players=players, date=most_recent_date, now=datetime.now())
+
+
+def _render_pitch_leaders(model, most_recent_date, template, min_inn):
+    """Shared rendering for the season and yesterday pitcher-leader pages.
+
+    `min_inn` is the qualifying innings threshold."""
+    players = db.session.query(model).filter(
+        model.Date == most_recent_date,
+        model.INN >= min_inn
+    ).order_by(model.ERA, desc(model.INN)).all()
+
+    for player in players:
+        player.clean_name = clean_player_name(player.Player)
+        calc_pitching_stats(player)
+
+    return render_template(template, players=players, date=most_recent_date, now=datetime.now())
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -100,12 +206,8 @@ def home():
 
 
 @main.route('/team-stats')
-def team_stats():
-    most_recent_date = _max_date_for_model(Team)
-    if not most_recent_date:
-        flash("No team data available", "warning")
-        return redirect(url_for('main.home'))
-
+@require_recent_date(Team, "No team data available")
+def team_stats(most_recent_date):
     teams = Team.query.filter_by(Date=most_recent_date).order_by(Team.BUTeam).all()
     for team in teams:
         calc_hitting_stats(team)
@@ -115,44 +217,19 @@ def team_stats():
 
 
 @main.route('/hitleaders')
-def hit_leaders():
-    most_recent_date = _max_date_for_model(Team)
-    if not most_recent_date:
-        flash("No team data available", "warning")
-        return redirect(url_for('main.home'))
-
+@require_recent_date(Team, "No team data available")
+def hit_leaders(most_recent_date):
     qualifying_abs = HITTING_AB_MULTIPLIER * _max_bu_games(most_recent_date)
-
-    players = db.session.query(HitterStats).filter(
-        HitterStats.Date == most_recent_date,
-        HitterStats.AB >= qualifying_abs
-    ).order_by(desc(HitterStats.RC), desc(HitterStats.AB)).all()
-
-    for player in players:
-        calc_hitting_stats(player)
-
-    return render_template('hitleaders.html', players=players, date=most_recent_date, now=datetime.now())
+    return _render_hit_leaders(HitterStats, most_recent_date, 'hitleaders.html',
+                               min_ab=qualifying_abs, set_clean_name=False)
 
 
 @main.route('/pitchleaders')
-def pitch_leaders():
-    most_recent_date = _max_date_for_model(Team)
-    if not most_recent_date:
-        flash("No team data available", "warning")
-        return redirect(url_for('main.home'))
-
+@require_recent_date(Team, "No team data available")
+def pitch_leaders(most_recent_date):
     qualifying_innings = PITCHING_INN_QUALIFIER * _max_bu_games(most_recent_date)
-
-    players = db.session.query(PitcherStats).filter(
-        PitcherStats.Date == most_recent_date,
-        PitcherStats.INN >= qualifying_innings
-    ).order_by(PitcherStats.ERA, desc(PitcherStats.INN)).all()
-
-    for player in players:
-        player.clean_name = clean_player_name(player.Player)
-        calc_pitching_stats(player)
-
-    return render_template('pitchleaders.html', players=players, date=most_recent_date, now=datetime.now())
+    return _render_pitch_leaders(PitcherStats, most_recent_date, 'pitchleaders.html',
+                                 min_inn=qualifying_innings)
 
 
 @main.route('/teamstatsyest')
@@ -178,8 +255,7 @@ def teamstatsyest():
             continue
 
         prev = previous_teams[buteam]
-        changes = type('TeamChanges', (), {})()
-        changes.BUTeam = buteam
+        changes = TeamChanges(BUTeam=buteam)
 
         # Compute deltas for all stat fields
         hitting_fields = ['G', 'AB', 'H', '_2B', '_3B', 'HR', 'BB', 'HP', 'SB', 'CS', 'E', 'KO', 'RC', 'OPS']
@@ -234,12 +310,8 @@ def teamstatsyest():
 
 
 @main.route('/hitter-analysis', methods=['GET'])
-def hitter_analysis():
-    most_recent_date = _max_date_for_model(HitterStats)
-    if not most_recent_date:
-        flash("No hitter data available", "warning")
-        return redirect(url_for('main.home'))
-
+@require_recent_date(HitterStats, "No hitter data available")
+def hitter_analysis(most_recent_date):
     players_query = db.session.query(HitterStats.Player).filter(
         HitterStats.Date == most_recent_date,
         HitterStats.AB > 0
@@ -275,12 +347,8 @@ def hitter_analysis():
 
 
 @main.route('/pitcher-analysis', methods=['GET'])
-def pitcher_analysis():
-    most_recent_date = _max_date_for_model(PitcherStats)
-    if not most_recent_date:
-        flash("No pitcher data available", "warning")
-        return redirect(url_for('main.home'))
-
+@require_recent_date(PitcherStats, "No pitcher data available")
+def pitcher_analysis(most_recent_date):
     players_query = db.session.query(PitcherStats.Player).filter(
         PitcherStats.Date == most_recent_date,
         PitcherStats.INN > 0
@@ -316,52 +384,22 @@ def pitcher_analysis():
 
 
 @main.route('/hitleadersyest')
-def hit_leaders_yest():
-    most_recent_date = _max_date_for_model(HitterStats_yest)
-
-    if not most_recent_date:
-        flash("No data available in HitterStats_yest table", "warning")
-        return redirect(url_for('main.home'))
-
-    players = db.session.query(HitterStats_yest).filter(
-        HitterStats_yest.Date == most_recent_date
-    ).order_by(desc(HitterStats_yest.RC), desc(HitterStats_yest.AB)).all()
-
-    for player in players:
-        player.clean_name = clean_player_name(player.Player)
-        calc_hitting_stats(player)
-
-    return render_template('hitleadersyest.html', players=players, date=most_recent_date, now=datetime.now())
+@require_recent_date(HitterStats_yest, "No data available in HitterStats_yest table")
+def hit_leaders_yest(most_recent_date):
+    return _render_hit_leaders(HitterStats_yest, most_recent_date, 'hitleadersyest.html',
+                               min_ab=None, set_clean_name=True)
 
 
 @main.route('/pitchleadersyest')
-def pitch_leaders_yest():
-    most_recent_date = _max_date_for_model(PitcherStats_yest)
-
-    if not most_recent_date:
-        flash("No data available in pitcherStats_yest table", "warning")
-        return redirect(url_for('main.home'))
-
-    players = db.session.query(PitcherStats_yest).filter(
-        PitcherStats_yest.Date == most_recent_date,
-        PitcherStats_yest.INN >= PITCHER_MIN_INNINGS
-    ).order_by(PitcherStats_yest.ERA, desc(PitcherStats_yest.INN)).all()
-
-    for player in players:
-        player.clean_name = clean_player_name(player.Player)
-        calc_pitching_stats(player)
-
-    return render_template('pitchleadersyest.html', players=players, date=most_recent_date, now=datetime.now())
+@require_recent_date(PitcherStats_yest, "No data available in pitcherStats_yest table")
+def pitch_leaders_yest(most_recent_date):
+    return _render_pitch_leaders(PitcherStats_yest, most_recent_date, 'pitchleadersyest.html',
+                                 min_inn=PITCHER_MIN_INNINGS)
 
 
 @main.route('/games')
-def games():
-    most_recent_date = _max_date_for_model(Games)
-
-    if not most_recent_date:
-        flash("No data available in games table", "warning")
-        return redirect(url_for('main.home'))
-
+@require_recent_date(Games, "No data available in games table")
+def games(most_recent_date):
     games_data = db.session.query(Games).filter(
         Games.Date == most_recent_date
     ).order_by(Games.BUTeam).all()
@@ -513,12 +551,8 @@ def _trade_player_lookup(date, team, raw_name):
 
 
 @main.route('/trade-analyzer')
-def trade_analyzer():
-    most_recent_date = _max_date_for_model(Team)
-    if not most_recent_date:
-        flash("No team data available", "warning")
-        return redirect(url_for('main.home'))
-
+@require_recent_date(Team, "No team data available")
+def trade_analyzer(most_recent_date):
     teams = [t[0] for t in db.session.query(Team.BUTeam).filter_by(
         Date=most_recent_date).distinct().order_by(Team.BUTeam).all()]
     roster = _players_by_team(most_recent_date)
