@@ -3,6 +3,7 @@ from app.models.team import Team
 from app.models.hitter import HitterStats, HitterStats_yest
 from app.models.pitcher import PitcherStats, PitcherStats_yest
 from app.models.games import Games
+from app.models.cubsschedule import CubsSchedule
 from app.extensions import db
 from app.services.stats import calc_hitting_stats, calc_pitching_stats, clean_player_name
 from app.services.charts import generate_player_chart
@@ -56,11 +57,9 @@ def _max_date_for_model(model):
 def _get_season_start_date():
     """Return the earliest date from cubsschedule for the current season year, or None."""
     year = _get_season_year()
-    result = db.session.execute(
-        db.text("SELECT MIN(date) FROM cubsschedule WHERE EXTRACT(YEAR FROM date) = :year"),
-        {'year': year}
+    return db.session.query(db.func.min(CubsSchedule.date)).filter(
+        db.extract('year', CubsSchedule.date) == year
     ).scalar()
-    return result
 
 
 @main.context_processor
@@ -77,6 +76,7 @@ def inject_bu_teams():
             _bu_teams_cache_ts = time.time()
         return dict(bu_teams=_bu_teams_cache)
     except Exception:
+        current_app.logger.exception("Failed to load BU teams for navigation")
         return dict(bu_teams=[])
 
 
@@ -197,9 +197,8 @@ def home():
 
     teams = Team.query.filter_by(Date=most_recent_date).order_by(desc(Team.WP)).all()
 
-    xfactor = db.session.execute(
-        db.text("SELECT xfactor FROM cubsschedule WHERE date = :d"),
-        {'d': most_recent_date}
+    xfactor = db.session.query(CubsSchedule.xfactor).filter(
+        CubsSchedule.date == most_recent_date
     ).scalar()
 
     return render_template('home.html', teams=teams, date=most_recent_date, xfactor=xfactor, now=datetime.now())
