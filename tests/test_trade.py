@@ -87,7 +87,7 @@ class TestPlayerDeltaStats:
         assert d == {'ER': 20, 'INN': 50}
 
 
-# Real teamstat rows for the most recent date in bu2025 (12-team league).
+# Real teamstat rows for 2026-06-09 in bu2025 (a full 12-team league day).
 # Columns: BUTeam, AB, H, 2B, 3B, HR, BB, HP, SB, CS, E, ER, INN
 _REAL_LEAGUE_ROWS = [
     ('Awobs',         2193, 539, 116, 14,  77, 247, 19, 41, 13, 29, 279, 613.0),
