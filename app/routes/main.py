@@ -308,78 +308,81 @@ def teamstatsyest():
                            now=datetime.now())
 
 
-@main.route('/hitter-analysis', methods=['GET'])
-@require_recent_date(HitterStats, "No hitter data available")
-def hitter_analysis(most_recent_date):
-    players_query = db.session.query(HitterStats.Player).filter(
-        HitterStats.Date == most_recent_date,
-        HitterStats.AB > 0
-    ).distinct().order_by(HitterStats.Player).all()
-    players = [p[0] for p in players_query]
+def _render_player_analysis(model, stat_attr, *, qualifier, template, ylabel, title_stat,
+                            ma_label, most_recent_date):
+    """Shared hitter/pitcher analysis page. Players are identified by the stable
+    CBS PlayerID (the dropdown value), so the over-time series spans every date
+    the player has rows regardless of name-string drift. The UI still shows names.
 
-    selected_player_name = request.args.get('player_name')
+    `stat_attr` is the charted column ('RC' or 'ERA'); `qualifier` restricts the
+    dropdown (e.g. AB > 0)."""
+    # Dropdown: one entry per PlayerID present on the most recent date.
+    rows = db.session.query(model.PlayerID, model.Player).filter(
+        model.Date == most_recent_date,
+        qualifier,
+        model.PlayerID.isnot(None)
+    ).distinct().all()
+    names_by_id = {}
+    for pid, name in rows:
+        names_by_id.setdefault(pid, clean_player_name(name))
+    players = sorted(({'id': pid, 'name': nm} for pid, nm in names_by_id.items()),
+                     key=lambda p: p['name'])
+
+    selected_player_id = request.args.get('player_id')
+    selected_player_name = None
     plot_url = None
 
     season_year = _get_season_year()
     x_min = date(season_year, 4, 1)
     x_max = most_recent_date + timedelta(days=1)
 
-    if selected_player_name:
-        date_filter = _year_filter(HitterStats.Date)
-        player_stats = db.session.query(HitterStats.Date, HitterStats.RC).filter(
-            HitterStats.Player == selected_player_name,
+    if selected_player_id:
+        date_filter = _year_filter(model.Date)
+        stat_col = getattr(model, stat_attr)
+        player_stats = db.session.query(model.Date, stat_col).filter(
+            model.PlayerID == selected_player_id,
             date_filter
-        ).order_by(HitterStats.Date).all()
+        ).order_by(model.Date).all()
+
+        # Display name = the player's name on their most recent row for this id.
+        name_row = db.session.query(model.Player).filter(
+            model.PlayerID == selected_player_id,
+            date_filter
+        ).order_by(desc(model.Date)).first()
+        selected_player_name = clean_player_name(name_row[0]) if name_row else selected_player_id
 
         plot_url = generate_player_chart(
             player_stats,
-            columns=['Date', 'RC'],
-            ylabel='RC (Runs Created)',
-            title=f'RC Over Time for {selected_player_name}',
-            ma_label=f'{MOVING_AVG_WINDOW}-Day Moving Avg RC',
+            columns=['Date', stat_attr],
+            ylabel=ylabel,
+            title=f'{title_stat} Over Time for {selected_player_name}',
+            ma_label=ma_label,
             x_min=x_min, x_max=x_max,
             window=MOVING_AVG_WINDOW
         )
 
-    return render_template('HitterAnalysis.html', players=players, plot_url=plot_url,
-                           selected_player_name=selected_player_name, date=most_recent_date, now=datetime.now())
+    return render_template(template, players=players, plot_url=plot_url,
+                           selected_player_id=selected_player_id,
+                           selected_player_name=selected_player_name,
+                           date=most_recent_date, now=datetime.now())
+
+
+@main.route('/hitter-analysis', methods=['GET'])
+@require_recent_date(HitterStats, "No hitter data available")
+def hitter_analysis(most_recent_date):
+    return _render_player_analysis(
+        HitterStats, 'RC', qualifier=HitterStats.AB > 0, template='HitterAnalysis.html',
+        ylabel='RC (Runs Created)', title_stat='RC',
+        ma_label=f'{MOVING_AVG_WINDOW}-Day Moving Avg RC', most_recent_date=most_recent_date)
 
 
 @main.route('/pitcher-analysis', methods=['GET'])
 @require_recent_date(PitcherStats, "No pitcher data available")
 def pitcher_analysis(most_recent_date):
-    players_query = db.session.query(PitcherStats.Player).filter(
-        PitcherStats.Date == most_recent_date,
-        PitcherStats.INN > 0
-    ).distinct().order_by(PitcherStats.Player).all()
-    players = [p[0] for p in players_query]
-
-    selected_player_name = request.args.get('player_name')
-    plot_url = None
-
-    season_year = _get_season_year()
-    x_min = date(season_year, 4, 1)
-    x_max = most_recent_date + timedelta(days=1)
-
-    if selected_player_name:
-        date_filter = _year_filter(PitcherStats.Date)
-        player_stats = db.session.query(PitcherStats.Date, PitcherStats.ERA).filter(
-            PitcherStats.Player == selected_player_name,
-            date_filter
-        ).order_by(PitcherStats.Date).all()
-
-        plot_url = generate_player_chart(
-            player_stats,
-            columns=['Date', 'ERA'],
-            ylabel='ERA (Earned Run Average)',
-            title=f'ERA Over Time for {selected_player_name}',
-            ma_label=f'{MOVING_AVG_WINDOW}-Day Moving Avg ERA',
-            x_min=x_min, x_max=x_max,
-            window=MOVING_AVG_WINDOW
-        )
-
-    return render_template('PitcherAnalysis.html', players=players, plot_url=plot_url,
-                           selected_player_name=selected_player_name, date=most_recent_date, now=datetime.now())
+    return _render_player_analysis(
+        PitcherStats, 'ERA', qualifier=PitcherStats.INN > 0, template='PitcherAnalysis.html',
+        ylabel='ERA (Earned Run Average)', title_stat='ERA',
+        ma_label=f'{MOVING_AVG_WINDOW}-Day Moving Avg ERA', most_recent_date=most_recent_date)
 
 
 @main.route('/hitleadersyest')
@@ -465,24 +468,25 @@ def my_team_pitch_stats(team_name):
 
 def _players_by_team(most_recent_date):
     """Return a dict mapping each BUteam to a sorted list of player dicts
-    {name, raw, role} for every hitter and pitcher on that team.
+    {name, id, role} for every hitter and pitcher on that team.
 
-    `name` is the cleaned display name; `raw` is the original DB value used
-    for exact lookups (it may contain non-breaking spaces)."""
+    `name` is the cleaned display name; `id` is the stable CBS PlayerID used as
+    the trade token, falling back to the raw player name if the row has no
+    PlayerID yet (so no rostered player is ever dropped from the picker)."""
     roster = {}
 
-    hitters = db.session.query(HitterStats.BUTeam, HitterStats.Player).filter(
+    hitters = db.session.query(HitterStats.BUTeam, HitterStats.Player, HitterStats.PlayerID).filter(
         HitterStats.Date == most_recent_date
     ).distinct().all()
-    for team, player in hitters:
-        roster.setdefault(team, {})[clean_player_name(player)] = {'raw': player, 'role': 'H'}
+    for team, player, pid in hitters:
+        roster.setdefault(team, {})[clean_player_name(player)] = {'id': pid or player, 'role': 'H'}
 
-    pitchers = db.session.query(PitcherStats.BUTeam, PitcherStats.Player).filter(
+    pitchers = db.session.query(PitcherStats.BUTeam, PitcherStats.Player, PitcherStats.PlayerID).filter(
         PitcherStats.Date == most_recent_date
     ).distinct().all()
-    for team, player in pitchers:
+    for team, player, pid in pitchers:
         # A player listed as a pitcher takes the pitcher role
-        roster.setdefault(team, {})[clean_player_name(player)] = {'raw': player, 'role': 'P'}
+        roster.setdefault(team, {})[clean_player_name(player)] = {'id': pid or player, 'role': 'P'}
 
     # Hitters first (role 'H'), then pitchers (role 'P'); alphabetical within each group
     def _role_then_name(item):
@@ -490,7 +494,7 @@ def _players_by_team(most_recent_date):
         return (0 if info['role'] == 'H' else 1, name)
 
     return {
-        team: [{'name': name, 'raw': info['raw'], 'role': info['role']}
+        team: [{'name': name, 'id': info['id'], 'role': info['role']}
                for name, info in sorted(players.items(), key=_role_then_name)]
         for team, players in roster.items()
     }
@@ -508,8 +512,12 @@ def _league_team_rows(date):
     return [dict(zip(TEAMSTAT_WP_COLS, r)) for r in rows]
 
 
-def _trade_player_lookup(date, team, raw_name):
+def _trade_player_lookup(date, team, token):
     """Look up a player's display stats, role, and WP-relevant raw stats.
+
+    `token` is the stable CBS PlayerID, falling back to the raw player name (the
+    `_players_by_team` fallback). Match on either, on the given date/team. Since
+    ids are numeric strings and names are text, the OR cannot mis-match.
 
     Returns {player, role, stats, wp_raw} or None if the player is not found.
     `stats` is for display (hitters: PA/E/RC, pitchers: IP/ERA); `wp_raw` holds
@@ -518,7 +526,7 @@ def _trade_player_lookup(date, team, raw_name):
     h = db.session.query(HitterStats).filter(
         HitterStats.Date == date,
         HitterStats.BUTeam == team,
-        HitterStats.Player == raw_name
+        db.or_(HitterStats.PlayerID == token, HitterStats.Player == token)
     ).first()
     if h:
         pa = (h.AB or 0) + (h.BB or 0) + (h.HP or 0)
@@ -536,7 +544,7 @@ def _trade_player_lookup(date, team, raw_name):
     p = db.session.query(PitcherStats).filter(
         PitcherStats.Date == date,
         PitcherStats.BUTeam == team,
-        PitcherStats.Player == raw_name
+        db.or_(PitcherStats.PlayerID == token, PitcherStats.Player == token)
     ).first()
     if p:
         return {

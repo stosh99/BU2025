@@ -9,11 +9,11 @@
     <form method="GET" action="{{ url_for('main.pitcher_analysis') }}" class="mb-4">
         <div class="form-row align-items-end">
             <div class="col-md-4">
-                <label for="player_name">Select Pitcher:</label>
-                <select name="player_name" id="player_name" class="form-control">
+                <label for="player_id">Select Pitcher:</label>
+                <select name="player_id" id="player_id" class="form-control">
                     <option value="">-- Select a Pitcher --</option>
                     {% for player in players %}
-                        <option value="{{ player }}" {% if player == selected_player_name %}selected{% endif %}>{{ player }}</option>
+                        <option value="{{ player.id }}" {% if player.id == selected_player_id %}selected{% endif %}>{{ player.name }}</option>
                     {% endfor %}
                 </select>
             </div>
