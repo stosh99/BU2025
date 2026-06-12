@@ -1,6 +1,7 @@
 # Environment & secrets
 .env
 *.env
+scripts/cbs_cookies.json
 
 # Python
 __pycache__/
