@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import numpy as np
 import pandas as pd
@@ -83,6 +84,22 @@ def convert_both_stats(soup):
     return team_hit_list, team_pitch_list
 
 
+# Each player-name cell links to /players/playerpage/<id> (the stable CBS fantasy
+# id, 7-8 digits). The team cell uses /teams/<n>, so matching 'playerpage' is
+# unambiguous and there is exactly one player link per stat row.
+PLAYERPAGE_RE = re.compile(r'/players/playerpage/(\d+)')
+
+
+def _extract_player_id(row):
+    """Return the CBS player id from a stat row's player-name link, or None."""
+    a = row.find('a', href=PLAYERPAGE_RE)
+    if a:
+        m = PLAYERPAGE_RE.search(a['href'])
+        if m:
+            return m.group(1)
+    return None
+
+
 def convert_hit_stats(soup):
     stats_date = soup.find("div", class_="tableLastUpdatedTimestamp").get_text(strip=True).replace("Report Updated as of ", "").split()[0]
     stats_date = datetime.strptime(stats_date, "%m/%d/%y") - timedelta(days=1)
@@ -100,6 +117,7 @@ def convert_hit_stats(soup):
                 print(f"WARNING: unknown team code '{team_code}' in hit stats — skipping row")
                 continue
             hit_row[1] = resolved
+        hit_row.append(_extract_player_id(row))
         player_hit_list.append(hit_row)
     return player_hit_list
 
@@ -121,6 +139,7 @@ def convert_pitch_stats(soup):
                 print(f"WARNING: unknown team code '{team_code}' in pitch stats — skipping row")
                 continue
             pitch_row[1] = resolved
+        pitch_row.append(_extract_player_id(row))
         player_pitch_list.append(pitch_row)
     return player_pitch_list
 
@@ -153,17 +172,21 @@ def create_team_df(team_hit_list, team_pitch_list):
 
 
 def create_player_hit_df(player_hit_list):
-    hit_columns = ['Date', 'BUTeam', 'Player', 'Salary', 'G', 'AB', 'H', '2B', '3B', 'HR', 'BB', 'HP', 'SB', 'CS', 'E', 'KO', 'RC', 'OPS']
+    hit_columns = ['Date', 'BUTeam', 'Player', 'Salary', 'G', 'AB', 'H', '2B', '3B', 'HR', 'BB', 'HP', 'SB', 'CS', 'E', 'KO', 'RC', 'OPS', 'PlayerID']
     df = pd.DataFrame(player_hit_list, columns=hit_columns)
     for col in df.columns[3:]:
+        if col == 'PlayerID':   # external id stays text, not float
+            continue
         df[col] = df[col].astype(float)
     return df
 
 
 def create_player_pitch_df(player_pitch_list):
-    pitch_columns = ['Date', 'BUTeam', 'Player', 'Salary', 'APP', 'GS', 'QS', 'INN', 'ER', 'RA', 'ERA', 'HA', 'K', 'BBI', 'W', 'L', 'S']
+    pitch_columns = ['Date', 'BUTeam', 'Player', 'Salary', 'APP', 'GS', 'QS', 'INN', 'ER', 'RA', 'ERA', 'HA', 'K', 'BBI', 'W', 'L', 'S', 'PlayerID']
     df = pd.DataFrame(player_pitch_list, columns=pitch_columns)
     for col in df.columns[3:]:
+        if col == 'PlayerID':   # external id stays text, not float
+            continue
         df[col] = df[col].astype(float)
     return df
 
